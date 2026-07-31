@@ -1,0 +1,5 @@
+import Redis from 'ioredis'; import { ApiClient } from './api-client.js'; import { BotRunner } from './bot-runner.js'; import { loadConfig } from './config.js';
+const config=loadConfig(process.env);const redis=new Redis(config.REDIS_URL,{maxRetriesPerRequest:3});const api=new ApiClient(config.INTERNAL_API_URL,config.WORKER_SERVICE_TOKEN);const runners=new Map<string,BotRunner>();
+async function reconcile():Promise<void>{for(const bot of await api.listBots()){if(runners.has(bot.id))continue;const runner=new BotRunner(bot,api,redis,config.WORKER_ID,config.LOCK_TTL_MS);if(await runner.start())runners.set(bot.id,runner);}}
+const poll=setInterval(()=>void reconcile().catch(error=>console.error(JSON.stringify({level:'error',event:'reconcile_failed',message:error instanceof Error?error.message:'unknown'}))),config.POLL_INTERVAL_MS);void reconcile();
+async function shutdown():Promise<void>{clearInterval(poll);await Promise.all([...runners.values()].map(r=>r.stop()));await redis.quit();process.exit(0);}process.on('SIGTERM',()=>void shutdown());process.on('SIGINT',()=>void shutdown());
