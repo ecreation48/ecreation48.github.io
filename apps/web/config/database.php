@@ -1,0 +1,2 @@
+<?php
+return ['default'=>env('DB_CONNECTION','pgsql'),'connections'=>['pgsql'=>['driver'=>'pgsql','host'=>env('DB_HOST','postgres'),'port'=>env('DB_PORT',5432),'database'=>env('DB_DATABASE','voice_guardian'),'username'=>env('DB_USERNAME','voice_guardian'),'password'=>env('DB_PASSWORD'),'charset'=>'utf8','prefix'=>'','schema'=>'public','sslmode'=>'prefer']],'redis'=>['client'=>'predis','default'=>['host'=>env('REDIS_HOST','redis'),'port'=>env('REDIS_PORT',6379),'database'=>0]]];

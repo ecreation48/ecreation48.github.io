@@ -1,0 +1,1 @@
+{"name":"voice-guardian","private":true,"workspaces":["apps/discord-manager","packages/*"],"scripts":{"test":"npm -w apps/discord-manager test","typecheck":"npm -w apps/discord-manager run typecheck"},"engines":{"node":">=22"}}

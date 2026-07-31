@@ -1,0 +1,9 @@
+/.env
+/apps/web/.env
+**/vendor/
+**/node_modules/
+**/.phpunit.cache/
+**/storage/*.key
+**/storage/logs/*
+!/apps/web/storage/logs/.gitignore
+**/dist/

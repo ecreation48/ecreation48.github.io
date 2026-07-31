@@ -1,0 +1,4 @@
+import { randomUUID } from 'node:crypto'; import type Redis from 'ioredis';
+const RENEW_SCRIPT="if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('pexpire',KEYS[1],ARGV[2]) else return 0 end";
+const RELEASE_SCRIPT="if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end";
+export class RedisBotLock { readonly key:string; readonly owner=randomUUID(); constructor(private readonly redis:Redis,botId:string,private readonly ttlMs:number){this.key=`discord-bot-lock:${botId}`;} async acquire():Promise<boolean>{return (await this.redis.set(this.key,this.owner,'PX',this.ttlMs,'NX'))==='OK';} async renew():Promise<boolean>{return Number(await this.redis.eval(RENEW_SCRIPT,1,this.key,this.owner,String(this.ttlMs)))===1;} async release():Promise<void>{await this.redis.eval(RELEASE_SCRIPT,1,this.key,this.owner);} }

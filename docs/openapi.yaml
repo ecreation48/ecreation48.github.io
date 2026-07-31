@@ -1,0 +1,15 @@
+openapi: 3.1.0
+info: {title: Voice Guardian Internal API, version: 0.1.0}
+servers: [{url: /api/v1/internal}]
+components:
+  securitySchemes: {serviceToken: {type: http, scheme: bearer}}
+  schemas:
+    Bot: {type: object, required: [id, name, client_id, connection_status], properties: {id: {type: string, format: uuid}, name: {type: string}, client_id: {type: string}, connection_status: {type: string}}}
+security: [{serviceToken: []}]
+paths:
+  /bots:
+    get: {responses: {'200': {description: Bots actifs}}}
+  /bots/{bot}/credentials:
+    get: {parameters: [{in: path, name: bot, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: Identifiants du bot actif}, '401': {description: Non autorisé}}}
+  /bots/{bot}/heartbeat:
+    post: {parameters: [{in: path, name: bot, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: Heartbeat accepté}}}
