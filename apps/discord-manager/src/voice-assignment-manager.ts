@@ -1,4 +1,4 @@
-import { entersState, getVoiceConnection, joinVoiceChannel, VoiceConnectionStatus } from '@discordjs/voice';
+import { entersState, getVoiceConnection, joinVoiceChannel, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
 import type { Client, GuildMember, VoiceBasedChannel, VoiceState } from 'discord.js';
 import type { AudioBufferRecorder } from './audio-buffer-recorder.js';
 import type { ApiClient, ChannelAssignment } from './api-client.js';
@@ -11,6 +11,7 @@ export class VoiceAssignmentManager {
   private sessions = new Map<string, string>();
   private activeChannels = new Map<string, string>();
   private guildQueues = new Map<string, Promise<void>>();
+  private watchedConnections = new WeakSet<VoiceConnection>();
 
   constructor(
     private readonly client: Client,
@@ -165,6 +166,7 @@ export class VoiceAssignmentManager {
       });
     }
 
+    this.watchConnection(nextConnection, guild.id, channel.id);
     await entersState(nextConnection, VoiceConnectionStatus.Ready, 25_000);
     this.logInfo('voice_joined', { guild_id: guild.id, channel_id: channel.id, channel_name: channel.name });
 
@@ -180,6 +182,61 @@ export class VoiceAssignmentManager {
     this.activeChannels.set(guild.id, channel.id);
     this.clearLeaveTimer(channel.id);
     this.audioRecorder.attach(nextConnection, channel.id, session.id, assignment.buffer_seconds);
+  }
+
+  private watchConnection(connection: VoiceConnection, guildId: string, channelId: string): void {
+    if (this.watchedConnections.has(connection)) return;
+    this.watchedConnections.add(connection);
+
+    connection.on('stateChange', (oldState, newState) => {
+      this.logInfo('voice_connection_state_changed', {
+        guild_id: guildId,
+        channel_id: channelId,
+        old_status: oldState.status,
+        new_status: newState.status,
+      });
+
+      if (newState.status === VoiceConnectionStatus.Disconnected) {
+        void this.recoverConnection(connection, guildId, channelId);
+      }
+
+      if (newState.status === VoiceConnectionStatus.Destroyed) {
+        void this.cleanupDestroyedConnection(guildId, channelId);
+      }
+    });
+  }
+
+  private async recoverConnection(connection: VoiceConnection, guildId: string, channelId: string): Promise<void> {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+
+      if (connection.state.status !== VoiceConnectionStatus.Disconnected) return;
+
+      this.logInfo('voice_connection_rejoin_requested', { guild_id: guildId, channel_id: channelId });
+      connection.rejoin();
+      await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+      this.logInfo('voice_connection_recovered', { guild_id: guildId, channel_id: channelId });
+    } catch (error) {
+      this.logError('voice_connection_recover_failed', error);
+
+      if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
+        connection.destroy();
+      }
+    }
+  }
+
+  private async cleanupDestroyedConnection(guildId: string, channelId: string): Promise<void> {
+    if (this.activeChannels.get(guildId) !== channelId) return;
+
+    this.audioRecorder.detach(guildId);
+    this.activeChannels.delete(guildId);
+    this.leaveTimers.delete(channelId);
+
+    const sessionId = this.sessions.get(guildId);
+    if (sessionId) {
+      await this.api.endVoiceSession(sessionId).catch(() => undefined);
+      this.sessions.delete(guildId);
+    }
   }
 
   private async scheduleLeave(channel: VoiceBasedChannel): Promise<void> {
