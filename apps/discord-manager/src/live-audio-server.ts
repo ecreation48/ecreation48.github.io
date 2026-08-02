@@ -42,6 +42,17 @@ export class LiveAudioServer {
       }
 
       const [, guildId, channelId] = match;
+
+      if (request.method === 'HEAD') {
+        response.writeHead(200, {
+          'Content-Type': 'audio/wav',
+          'Cache-Control': 'no-store',
+          'X-Voice-Guardian-Live': this.channels.has(`${guildId}:${channelId}`) ? 'connected' : 'ready',
+        });
+        response.end();
+        return;
+      }
+
       this.addClient(`${guildId}:${channelId}`, response);
     });
 
@@ -80,12 +91,26 @@ export class LiveAudioServer {
     state.clients.add(response);
     this.channels.set(key, state);
 
+    console.log(JSON.stringify({
+      level: 'info',
+      event: 'live_audio_client_connected',
+      channel_key: key,
+      client_count: state.clients.size,
+    }));
+
     if (!state.timer) {
       state.timer = setInterval(() => this.broadcastFrame(key, state), FRAME_MS);
     }
 
     response.on('close', () => {
       state.clients.delete(response);
+
+      console.log(JSON.stringify({
+        level: 'info',
+        event: 'live_audio_client_disconnected',
+        channel_key: key,
+        client_count: state.clients.size,
+      }));
 
       if (state.clients.size === 0) {
         if (state.timer) clearInterval(state.timer);
