@@ -71,7 +71,7 @@ export class VoiceAssignmentManager {
           return;
         }
 
-        const next = await this.firstActiveAssignment(assignments);
+        const next = await this.preferredActiveAssignment(guildId, assignments);
 
         if (next) {
           await this.switchTo(next);
@@ -388,6 +388,32 @@ export class VoiceAssignmentManager {
     }
 
     return null;
+  }
+
+  private async preferredActiveAssignment(guildId: string, assignments: ChannelAssignment[]): Promise<ChannelAssignment | null> {
+    const activeChannelId = this.activeChannels.get(guildId);
+    const previous = activeChannelId
+      ? assignments.find((assignment) => assignment.channel_discord_id === activeChannelId)
+      : undefined;
+
+    if (!previous) return this.firstActiveAssignment(assignments);
+
+    const guild = this.client.guilds.cache.get(previous.guild_discord_id) ?? (await this.client.guilds.fetch(previous.guild_discord_id).catch(() => null));
+    const channel = guild?.channels.cache.get(previous.channel_discord_id) ?? (await guild?.channels.fetch(previous.channel_discord_id).catch(() => null));
+
+    if (channel?.isVoiceBased()) {
+      const members = this.humanMembers(channel);
+      this.logInfo('voice_previous_assignment_checked', {
+        guild_id: previous.guild_discord_id,
+        channel_id: previous.channel_discord_id,
+        channel_name: channel.name,
+        human_member_count: members.length,
+      });
+
+      if (members.length > 0) return previous;
+    }
+
+    return this.firstActiveAssignment(assignments);
   }
 
   private async recordVoiceEvent(oldState: VoiceState, newState: VoiceState): Promise<void> {
