@@ -1,4 +1,6 @@
+import { setDefaultResultOrder } from 'node:dns';
 import { Redis } from 'ioredis'; import { ApiClient } from './api-client.js'; import { BotRunner } from './bot-runner.js'; import { loadConfig } from './config.js'; import { LiveAudioServer } from './live-audio-server.js';
+setDefaultResultOrder('ipv4first');
 const config=loadConfig(process.env);const redis=new Redis(config.REDIS_URL,{maxRetriesPerRequest:3});const api=new ApiClient(config.INTERNAL_API_URL,config.WORKER_SERVICE_TOKEN);const liveAudio=new LiveAudioServer();liveAudio.start();const runners=new Map<string,BotRunner>();
 async function reconcile():Promise<void>{const bots=await api.listBots();const activeIds=new Set(bots.map(bot=>bot.id));for(const [botId,runner] of runners){if(activeIds.has(botId))continue;await runner.stop();runners.delete(botId);}for(const bot of bots){const existing=runners.get(bot.id);if(existing?.needsRestart(bot)){await existing.stop();runners.delete(bot.id);}if(runners.has(bot.id))continue;const runner=new BotRunner(bot,api,redis,config.WORKER_ID,config.LOCK_TTL_MS,liveAudio);if(await runner.start())runners.set(bot.id,runner);}}
 function logError(event:string,error:unknown):void{console.error(JSON.stringify({level:'error',event,message:error instanceof Error?error.message:'unknown'}));}

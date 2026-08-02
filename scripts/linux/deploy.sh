@@ -24,6 +24,20 @@ sudo -u "$APP_USER" composer install --working-dir=apps/web --no-dev --prefer-di
 sudo -u "$APP_USER" npm ci
 sudo -u "$APP_USER" npm -w apps/discord-manager run build
 
+PHP_FPM_SERVICE="$(systemctl list-unit-files 'php*-fpm.service' --no-legend | awk '{print $1}' | sort -V | tail -n 1)"
+if [[ -z "$PHP_FPM_SERVICE" ]] && systemctl list-unit-files php-fpm.service --no-legend >/dev/null 2>&1; then
+  PHP_FPM_SERVICE="php-fpm.service"
+fi
+
+if [[ -n "$PHP_FPM_SERVICE" ]]; then
+  for service_file in "$APP_DIR"/deploy/linux/systemd/*.service; do
+    sed "s#@@PHP_FPM_SERVICE@@#$PHP_FPM_SERVICE#g" "$service_file" > "/etc/systemd/system/$(basename "$service_file")"
+  done
+
+  cp "$APP_DIR"/deploy/linux/systemd/*.timer /etc/systemd/system/
+  systemctl daemon-reload
+fi
+
 if ! grep -q '^APP_KEY=base64:' /etc/voice-guardian/web.env; then
   sudo -u "$APP_USER" php apps/web/artisan key:generate --force
 fi
