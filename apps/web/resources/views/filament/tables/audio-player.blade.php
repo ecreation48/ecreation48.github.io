@@ -3,7 +3,6 @@
     <div class="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div>
             <div class="text-base font-semibold text-gray-950 dark:text-white">{{ $record->displayName() }}</div>
-            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $record->reported_user_discord_id }}</div>
         </div>
         <div class="flex flex-wrap gap-2 text-xs font-medium">
             <span class="rounded-md bg-gray-100 px-2.5 py-1.5 text-gray-700 dark:bg-gray-800 dark:text-gray-300">WAV</span>
