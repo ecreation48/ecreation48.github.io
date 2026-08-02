@@ -136,7 +136,23 @@ export class VoiceAssignmentManager {
     let nextConnection = connection;
 
     if (connection) {
-      if (connection.joinConfig.channelId === channel.id) {
+      if ([VoiceConnectionStatus.Destroyed, VoiceConnectionStatus.Disconnected].includes(connection.state.status)) {
+        this.logInfo('voice_connection_recreate_required', {
+          guild_id: guild.id,
+          channel_id: connection.joinConfig.channelId,
+          status: connection.state.status,
+        });
+
+        this.audioRecorder.detach(guild.id);
+        this.activeChannels.delete(guild.id);
+        this.recoveringGuilds.delete(guild.id);
+
+        if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
+          connection.destroy();
+        }
+
+        nextConnection = undefined;
+      } else if (connection.joinConfig.channelId === channel.id) {
         this.activeChannels.set(guild.id, channel.id);
 
         if (previousSessionId) {
