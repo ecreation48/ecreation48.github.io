@@ -8,12 +8,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        try {
+        if ($this->hasIndex('one_voice_connection_per_bot_guild')) {
             Schema::table('discord_channels', function (Blueprint $table): void {
                 $table->dropUnique('one_voice_connection_per_bot_guild');
             });
-        } catch (\Throwable) {
-            // Fresh installs already create the non-unique index.
         }
 
         if (! $this->hasIndex('discord_channels_guild_bot_index')) {

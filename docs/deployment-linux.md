@@ -19,7 +19,7 @@ sudo REPO_URL=https://github.com/ecreation48/ecreation48.github.io.git bash scri
 Le script installe :
 
 - Nginx
-- PHP-FPM disponible dans la distribution et extensions Laravel
+- PHP-FPM disponible dans la distribution et extensions Laravel, dont `intl`
 - Composer
 - Node.js 22
 - PostgreSQL

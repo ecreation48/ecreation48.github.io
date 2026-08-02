@@ -37,6 +37,7 @@ if [[ -n "$PHP_VERSION" ]] && apt-cache show "php${PHP_VERSION}-fpm" >/dev/null 
     "php${PHP_VERSION}-curl"
     "php${PHP_VERSION}-zip"
     "php${PHP_VERSION}-bcmath"
+    "php${PHP_VERSION}-intl"
     "php${PHP_VERSION}-redis"
   )
 elif apt-cache show php-fpm >/dev/null 2>&1; then
@@ -49,6 +50,7 @@ elif apt-cache show php-fpm >/dev/null 2>&1; then
     php-curl
     php-zip
     php-bcmath
+    php-intl
     php-redis
   )
 else

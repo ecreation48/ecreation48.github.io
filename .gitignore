@@ -1,5 +1,7 @@
 /.env
 /apps/web/.env
+.DS_Store
+**/.DS_Store
 **/vendor/
 **/node_modules/
 **/.phpunit.cache/
