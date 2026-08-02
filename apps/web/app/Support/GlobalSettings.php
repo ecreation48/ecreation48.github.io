@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\AppSetting;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class GlobalSettings
 {
@@ -12,11 +13,17 @@ class GlobalSettings
 
     public function all(): array
     {
-        if (! Schema::hasTable('app_settings')) {
+        try {
+            if (! Schema::hasTable('app_settings')) {
+                return $this->defaults();
+            }
+
+            $settings = AppSetting::query()->find(self::KEY)?->value ?? [];
+        } catch (Throwable) {
             return $this->defaults();
         }
 
-        return array_replace_recursive($this->defaults(), AppSetting::query()->find(self::KEY)?->value ?? []);
+        return array_replace_recursive($this->defaults(), $settings);
     }
 
     public function save(array $settings): void

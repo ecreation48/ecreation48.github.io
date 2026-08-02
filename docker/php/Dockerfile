@@ -9,7 +9,6 @@ COPY apps/web .
 COPY docker/php/entrypoint.sh /usr/local/bin/voice-guardian-entrypoint
 RUN chmod +x /usr/local/bin/voice-guardian-entrypoint \
     && composer dump-autoload --optimize \
-    && php artisan filament:assets \
     && mkdir -p storage/app storage/audio-clips storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache public/css public/js
 ENTRYPOINT ["voice-guardian-entrypoint"]
