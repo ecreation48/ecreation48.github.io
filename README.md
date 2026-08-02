@@ -1,99 +1,36 @@
 # Voice Guardian
 
-Socle de la phase 1 d'une plateforme de modération vocale Discord multi-bots. Le dépôt contient l'API Laravel 12/Filament 3, le gestionnaire Discord TypeScript et l'infrastructure PostgreSQL, Redis, MinIO et Nginx.
+Socle d'une plateforme de modération vocale Discord multi-bots. Le dépôt contient l'API Laravel 12/Filament 3, le gestionnaire Discord TypeScript, la transcription audio et l'installation Linux avec PostgreSQL, Redis, Nginx et systemd.
 
 ## Démarrage
 
-Prérequis : Docker avec Compose v2.
-
-```bash
-cp .env.docker.example .env
-# Remplacer les mots de passe et WORKER_SERVICE_TOKEN (au moins 24 caractères)
-./scripts/docker-install.sh
-```
-
-L'administration est exposée sur `http://localhost:8080/admin`. Créez le premier compte avec `docker compose exec laravel php artisan make:filament-user`.
-
-### Installation Docker complète sur Linux
-
-Cette version lance toute la plateforme en conteneurs : Nginx, Laravel/PHP-FPM, worker Laravel, scheduler, worker Discord, PostgreSQL et Redis.
-
-Sur Debian/Ubuntu :
+Prérequis serveur : Debian 13/Trixie ou Ubuntu 24.04, accès `root`, DNS optionnel.
 
 ```bash
 apt-get update
-apt-get install -y ca-certificates curl git
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
-. /etc/os-release
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+apt-get install -y sudo git ca-certificates curl unzip
+
+git clone https://github.com/ecreation48/ecreation48.github.io.git /tmp/voice-guardian-install
+cd /tmp/voice-guardian-install
+
+REPO_URL=https://github.com/ecreation48/ecreation48.github.io.git bash scripts/linux/install-server.sh
 ```
 
-Pour Ubuntu, remplacez l’URL `linux/debian` par `linux/ubuntu` dans la commande `echo` si nécessaire.
+L'application est installée dans `/opt/voice-guardian`. L'administration est disponible sur `http://IP_DU_SERVEUR/admin`.
 
-Puis installez Voice Guardian :
+Créez le premier compte admin :
 
 ```bash
-git clone https://github.com/ecreation48/ecreation48.github.io.git /opt/voice-guardian
-cd /opt/voice-guardian
-cp .env.docker.example .env
-nano .env
-```
-
-À modifier au minimum :
-
-```dotenv
-APP_URL=http://IP_DU_SERVEUR:8080
-DB_PASSWORD=un-mot-de-passe-long
-WORKER_SERVICE_TOKEN=un-token-long-au-moins-24-caracteres
-```
-
-Lancez ensuite :
-
-```bash
-./scripts/docker-install.sh
-```
-
-Créez le premier admin :
-
-```bash
-docker compose exec laravel php artisan make:filament-user
-```
-
-Ouvrez :
-
-```text
-http://IP_DU_SERVEUR:8080/admin
-```
-
-Commandes utiles Docker :
-
-```bash
-docker compose ps
-docker compose logs -f nginx laravel discord-manager
-docker compose logs -f laravel-worker
-docker compose exec laravel php artisan migrate:status
-docker compose exec laravel php artisan about
-docker compose restart discord-manager
-docker compose down
-docker compose up -d
+sudo -u voiceguardian php /opt/voice-guardian/apps/web/artisan make:filament-user
 ```
 
 Pour mettre à jour :
 
 ```bash
-cd /opt/voice-guardian
-git pull
-docker compose build
-docker compose run --rm laravel php artisan migrate --force
-docker compose run --rm laravel php artisan optimize:clear
-docker compose up -d
+sudo bash /opt/voice-guardian/scripts/linux/deploy.sh
 ```
 
-Par défaut, la transcription Docker est désactivée (`TRANSCRIPTION_PROVIDER=none`) pour éviter de construire Whisper dans l’image. Vous pouvez utiliser une API externe avec `TRANSCRIPTION_PROVIDER=openai`, ou monter un binaire `whisper.cpp` dans le conteneur `discord-manager` et configurer `TRANSCRIPTION_COMMAND`.
+Le guide complet est disponible dans [docs/deployment-linux.md](docs/deployment-linux.md).
 
 ## Développement
 

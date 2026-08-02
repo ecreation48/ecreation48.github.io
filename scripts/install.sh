@@ -1,4 +1,4 @@
 #!/usr/bin/env sh
 set -eu
 
-exec ./scripts/docker-install.sh
+exec ./scripts/linux/install-server.sh
