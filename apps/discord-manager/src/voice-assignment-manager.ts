@@ -178,6 +178,7 @@ export class VoiceAssignmentManager {
         channelId: channel.id,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
+        daveEncryption: false,
         debug: true,
         selfDeaf: false,
         selfMute: false,
