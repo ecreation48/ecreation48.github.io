@@ -60,8 +60,12 @@ export class VoiceAssignmentManager {
 
     for (const [guildId, assignments] of assignmentsByGuild) {
       await this.enqueueGuild(guildId, async () => {
-        if (this.recoveringGuilds.has(guildId)) {
-          this.logInfo('voice_guild_reconcile_deferred_during_recovery', { guild_id: guildId });
+        const connection = getVoiceConnection(guildId);
+        if (connection?.state.status === VoiceConnectionStatus.Disconnected) {
+          this.logInfo('voice_guild_reconcile_deferred_during_recovery', {
+            guild_id: guildId,
+            channel_id: connection.joinConfig.channelId,
+          });
           return;
         }
 
@@ -98,10 +102,12 @@ export class VoiceAssignmentManager {
   private async maybeJoin(state: VoiceState): Promise<void> {
     const channel = state.channel;
     if (!channel || state.member?.user.bot) return;
-    if (this.recoveringGuilds.has(channel.guild.id)) {
+    const existingConnection = getVoiceConnection(channel.guild.id);
+    if (existingConnection?.state.status === VoiceConnectionStatus.Disconnected) {
       this.logInfo('voice_join_deferred_during_recovery', {
         guild_id: channel.guild.id,
-        channel_id: channel.id,
+        channel_id: existingConnection.joinConfig.channelId,
+        target_channel_id: channel.id,
       });
       return;
     }
