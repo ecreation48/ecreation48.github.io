@@ -214,7 +214,7 @@ export class VoiceAssignmentManager {
       });
 
       if (newState.status === VoiceConnectionStatus.Disconnected) {
-        void this.recoverConnection(connection, guildId, channelId);
+        void this.recreateConnection(connection, guildId, channelId);
       }
 
       if (newState.status === VoiceConnectionStatus.Destroyed) {
@@ -223,7 +223,7 @@ export class VoiceAssignmentManager {
     });
   }
 
-  private async recoverConnection(connection: VoiceConnection, guildId: string, channelId: string): Promise<void> {
+  private async recreateConnection(connection: VoiceConnection, guildId: string, channelId: string): Promise<void> {
     if (this.recoveringGuilds.has(guildId)) return;
     this.recoveringGuilds.add(guildId);
 
@@ -232,12 +232,15 @@ export class VoiceAssignmentManager {
 
       if (connection.state.status !== VoiceConnectionStatus.Disconnected) return;
 
-      this.logInfo('voice_connection_rejoin_requested', { guild_id: guildId, channel_id: channelId });
-      connection.rejoin();
-      await entersState(connection, VoiceConnectionStatus.Ready, 10_000);
-      this.logInfo('voice_connection_recovered', { guild_id: guildId, channel_id: channelId });
+      this.logInfo('voice_connection_recreate_requested', { guild_id: guildId, channel_id: channelId });
+      connection.destroy();
+
+      const assignment = this.assignments.get(channelId);
+      if (!assignment) return;
+
+      await this.switchTo(assignment);
     } catch (error) {
-      this.logError('voice_connection_recover_failed', error);
+      this.logError('voice_connection_recreate_failed', error);
 
       if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
         connection.destroy();
