@@ -4,6 +4,7 @@ import type { AudioBufferRecorder } from './audio-buffer-recorder.js';
 import type { ApiClient, ChannelAssignment } from './api-client.js';
 
 const EMPTY_CHANNEL_GRACE_MS = 30_000;
+const DISCONNECTED_RECOVERY_GRACE_MS = Number(process.env.VOICE_DISCONNECTED_RECOVERY_GRACE_MS ?? 8_000);
 const voiceDebugEnabled = process.env.VOICE_DEBUG === 'true';
 const voiceDaveEncryptionEnabled = process.env.VOICE_DAVE_ENCRYPTION !== 'false';
 const voiceSelfDeafEnabled = process.env.VOICE_SELF_DEAF === 'true';
@@ -16,6 +17,7 @@ export class VoiceAssignmentManager {
   private guildQueues = new Map<string, Promise<void>>();
   private watchedConnections = new WeakSet<VoiceConnection>();
   private recoveringGuilds = new Set<string>();
+  private joinAttempts = new Map<string, number>();
 
   constructor(
     private readonly client: Client,
@@ -175,6 +177,7 @@ export class VoiceAssignmentManager {
     }
 
     const members = this.humanMembers(channel);
+    const joinAttempt = this.nextJoinAttempt(guild.id);
 
     if (!nextConnection) {
       nextConnection = joinVoiceChannel({
@@ -192,6 +195,15 @@ export class VoiceAssignmentManager {
     try {
       await entersState(nextConnection, VoiceConnectionStatus.Ready, 25_000);
     } catch (error) {
+      if (!this.isCurrentJoinAttempt(guild.id, joinAttempt)) {
+        this.logInfo('voice_connection_stale_ready_timeout_ignored', {
+          guild_id: guild.id,
+          channel_id: channel.id,
+          join_attempt: joinAttempt,
+        });
+        return;
+      }
+
       this.logError('voice_connection_ready_timeout', error);
       this.audioRecorder.detach(guild.id);
       this.activeChannels.delete(guild.id);
@@ -202,6 +214,15 @@ export class VoiceAssignmentManager {
       }
 
       throw error;
+    }
+
+    if (!this.isCurrentJoinAttempt(guild.id, joinAttempt)) {
+      this.logInfo('voice_connection_stale_ready_ignored', {
+        guild_id: guild.id,
+        channel_id: channel.id,
+        join_attempt: joinAttempt,
+      });
+      return;
     }
 
     this.logInfo('voice_joined', { guild_id: guild.id, channel_id: channel.id, channel_name: channel.name });
@@ -266,11 +287,19 @@ export class VoiceAssignmentManager {
     this.recoveringGuilds.add(guildId);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      await new Promise((resolve) => setTimeout(resolve, DISCONNECTED_RECOVERY_GRACE_MS));
 
-      if (connection.state.status !== VoiceConnectionStatus.Disconnected) return;
+      if (connection.state.status !== VoiceConnectionStatus.Disconnected) {
+        this.logInfo('voice_connection_recovered_without_recreate', {
+          guild_id: guildId,
+          channel_id: channelId,
+          status: connection.state.status,
+        });
+        return;
+      }
 
       this.logInfo('voice_connection_recreate_requested', { guild_id: guildId, channel_id: channelId });
+      this.nextJoinAttempt(guildId);
       connection.destroy();
 
       const assignment = this.assignments.get(channelId);
@@ -498,6 +527,17 @@ export class VoiceAssignmentManager {
 
     clearTimeout(timer);
     this.leaveTimers.delete(channelId);
+  }
+
+  private nextJoinAttempt(guildId: string): number {
+    const next = (this.joinAttempts.get(guildId) ?? 0) + 1;
+    this.joinAttempts.set(guildId, next);
+
+    return next;
+  }
+
+  private isCurrentJoinAttempt(guildId: string, attempt: number): boolean {
+    return this.joinAttempts.get(guildId) === attempt;
   }
 
   private hasHumanMembers(channel: VoiceBasedChannel): boolean {
