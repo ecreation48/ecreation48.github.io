@@ -51,6 +51,8 @@ APP_URL=https://votre-domaine.fr
 WORKER_SERVICE_TOKEN=le-meme-token-dans-les-deux-fichiers
 INTERNAL_API_URL=http://127.0.0.1/api/v1/internal
 LIVE_AUDIO_PORT=8787
+VOICE_AUDIO_CAPTURE=true
+VOICE_AUDIO_CAPTURE_DELAY_MS=3000
 ```
 
 Après modification :
