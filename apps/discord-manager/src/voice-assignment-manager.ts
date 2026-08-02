@@ -178,6 +178,7 @@ export class VoiceAssignmentManager {
         channelId: channel.id,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
+        daveEncryption: false,
         selfDeaf: false,
         selfMute: false,
       });
@@ -211,6 +212,8 @@ export class VoiceAssignmentManager {
         channel_id: channelId,
         old_status: oldState.status,
         new_status: newState.status,
+        reason: 'reason' in newState ? newState.reason : null,
+        close_code: 'closeCode' in newState ? newState.closeCode : null,
       });
 
       if (newState.status === VoiceConnectionStatus.Disconnected) {
