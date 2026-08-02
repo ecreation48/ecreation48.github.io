@@ -1,10 +1,10 @@
-import { entersState, getVoiceConnection, joinVoiceChannel, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
+import { entersState, getVoiceConnection, joinVoiceChannel, VoiceConnectionDisconnectReason, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
 import type { Client, GuildMember, VoiceBasedChannel, VoiceState } from 'discord.js';
 import type { AudioBufferRecorder } from './audio-buffer-recorder.js';
 import type { ApiClient, ChannelAssignment } from './api-client.js';
 
 const EMPTY_CHANNEL_GRACE_MS = 30_000;
-const DISCONNECTED_RECOVERY_GRACE_MS = Number(process.env.VOICE_DISCONNECTED_RECOVERY_GRACE_MS ?? 8_000);
+const DISCONNECTED_RECOVERY_GRACE_MS = Number(process.env.VOICE_DISCONNECTED_RECOVERY_GRACE_MS ?? 5_000);
 const voiceDebugEnabled = process.env.VOICE_DEBUG === 'true';
 const voiceDaveEncryptionEnabled = process.env.VOICE_DAVE_ENCRYPTION !== 'false';
 const voiceSelfDeafEnabled = process.env.VOICE_SELF_DEAF === 'true';
@@ -282,9 +282,12 @@ export class VoiceAssignmentManager {
         if (this.recoveringGuilds.has(guildId)) return;
         this.recoveringGuilds.add(guildId);
 
+        const reason = 'reason' in newState ? newState.reason : null;
+        const closeCode = 'closeCode' in newState ? newState.closeCode : null;
+
         void this.enqueueGuild(
           guildId,
-          () => this.recreateConnection(connection, guildId, channelId),
+          () => this.recoverConnection(connection, guildId, channelId, reason, closeCode),
           'voice_connection_recreate_failed',
         );
       }
@@ -307,19 +310,44 @@ export class VoiceAssignmentManager {
     });
   }
 
-  private async recreateConnection(connection: VoiceConnection, guildId: string, channelId: string): Promise<void> {
+  private async recoverConnection(
+    connection: VoiceConnection,
+    guildId: string,
+    channelId: string,
+    reason: number | null,
+    closeCode: number | null,
+  ): Promise<void> {
     try {
-      await new Promise((resolve) => setTimeout(resolve, DISCONNECTED_RECOVERY_GRACE_MS));
+      const expectedRecoveryStatus = reason === VoiceConnectionDisconnectReason.WebSocketClose && closeCode === 4014
+        ? VoiceConnectionStatus.Signalling
+        : VoiceConnectionStatus.Ready;
+
+      await entersState(connection, expectedRecoveryStatus, DISCONNECTED_RECOVERY_GRACE_MS);
 
       if (connection.state.status !== VoiceConnectionStatus.Disconnected) {
         this.logInfo('voice_connection_recreate_skipped', {
           guild_id: guildId,
           channel_id: channelId,
           status: connection.state.status,
+          reason,
+          close_code: closeCode,
         });
         return;
       }
+    } catch {
+      if (connection.state.status !== VoiceConnectionStatus.Disconnected) {
+        this.logInfo('voice_connection_recreate_skipped', {
+          guild_id: guildId,
+          channel_id: channelId,
+          status: connection.state.status,
+          reason,
+          close_code: closeCode,
+        });
+        return;
+      }
+    }
 
+    try {
       this.logInfo('voice_connection_recreate_requested', { guild_id: guildId, channel_id: channelId });
       this.nextJoinAttempt(guildId);
       connection.destroy();
@@ -329,10 +357,6 @@ export class VoiceAssignmentManager {
 
       await this.switchTo(assignment, { forceDisconnected: true });
     } catch (error) {
-      if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
-        connection.destroy();
-      }
-
       throw error;
     } finally {
       this.recoveringGuilds.delete(guildId);
