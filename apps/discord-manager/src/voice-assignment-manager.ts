@@ -265,7 +265,7 @@ export class VoiceAssignmentManager {
     this.sessions.set(guild.id, session.id);
     this.activeChannels.set(guild.id, channel.id);
     this.clearLeaveTimer(channel.id);
-    this.audioRecorder.attach(nextConnection, channel.id, session.id, assignment.buffer_seconds);
+    this.audioRecorder.attach(nextConnection, channel.id, session.id, assignment.buffer_seconds, members.map((member) => member.discord_user_id));
   }
 
   private watchConnection(connection: VoiceConnection, guildId: string, channelId: string): void {
