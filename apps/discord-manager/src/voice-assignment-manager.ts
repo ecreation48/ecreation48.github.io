@@ -60,6 +60,11 @@ export class VoiceAssignmentManager {
 
     for (const [guildId, assignments] of assignmentsByGuild) {
       await this.enqueueGuild(guildId, async () => {
+        if (this.recoveringGuilds.has(guildId)) {
+          this.logInfo('voice_guild_reconcile_deferred_during_recovery', { guild_id: guildId });
+          return;
+        }
+
         const current = await this.currentChannel(guildId);
         this.logInfo('voice_guild_reconcile', {
           guild_id: guildId,
@@ -93,6 +98,13 @@ export class VoiceAssignmentManager {
   private async maybeJoin(state: VoiceState): Promise<void> {
     const channel = state.channel;
     if (!channel || state.member?.user.bot) return;
+    if (this.recoveringGuilds.has(channel.guild.id)) {
+      this.logInfo('voice_join_deferred_during_recovery', {
+        guild_id: channel.guild.id,
+        channel_id: channel.id,
+      });
+      return;
+    }
 
     const assignment = this.assignments.get(channel.id);
     if (!assignment) return;
@@ -131,7 +143,7 @@ export class VoiceAssignmentManager {
     await this.scheduleLeave(channel);
   }
 
-  private async switchTo(assignment: ChannelAssignment): Promise<void> {
+  private async switchTo(assignment: ChannelAssignment, options: { forceDisconnected?: boolean } = {}): Promise<void> {
     const guild = this.client.guilds.cache.get(assignment.guild_discord_id) ?? (await this.client.guilds.fetch(assignment.guild_discord_id));
     const channel = (guild.channels.cache.get(assignment.channel_discord_id) ?? (await guild.channels.fetch(assignment.channel_discord_id))) as VoiceBasedChannel | null;
     if (!channel?.isVoiceBased()) return;
@@ -142,6 +154,15 @@ export class VoiceAssignmentManager {
 
     if (connection) {
       if ([VoiceConnectionStatus.Destroyed, VoiceConnectionStatus.Disconnected].includes(connection.state.status)) {
+        if (connection.state.status === VoiceConnectionStatus.Disconnected && this.recoveringGuilds.has(guild.id) && !options.forceDisconnected) {
+          this.logInfo('voice_switch_deferred_during_recovery', {
+            guild_id: guild.id,
+            channel_id: connection.joinConfig.channelId,
+            target_channel_id: channel.id,
+          });
+          return;
+        }
+
         this.logInfo('voice_connection_recreate_required', {
           guild_id: guild.id,
           channel_id: connection.joinConfig.channelId,
@@ -305,7 +326,7 @@ export class VoiceAssignmentManager {
       const assignment = this.assignments.get(channelId);
       if (!assignment) return;
 
-      await this.switchTo(assignment);
+      await this.switchTo(assignment, { forceDisconnected: true });
     } catch (error) {
       if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
         connection.destroy();
