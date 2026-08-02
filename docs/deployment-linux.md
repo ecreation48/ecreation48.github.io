@@ -2,7 +2,7 @@
 
 Ce guide prépare un serveur Linux pour Voice Guardian avec Laravel/Filament, PostgreSQL, Redis, Nginx, le worker Discord Node.js et la transcription locale Whisper.
 
-La cible recommandée est Ubuntu 24.04 LTS ou Debian 13/Trixie. Le projet demande PHP 8.3 minimum et Node.js 22.
+La cible recommandée est Ubuntu 24.04 LTS ou Debian 13/Trixie. Le projet demande PHP 8.3 minimum et Node.js 24.
 
 ## Installation complète
 
@@ -21,7 +21,7 @@ Le script installe :
 - Nginx
 - PHP-FPM disponible dans la distribution et extensions Laravel, dont `intl`
 - Composer
-- Node.js 22
+- Node.js 24
 - PostgreSQL
 - Redis
 - les services systemd du projet

@@ -115,7 +115,7 @@ cd /tmp/voice-guardian-install
 REPO_URL=https://github.com/ecreation48/ecreation48.github.io.git bash scripts/linux/install-server.sh
 ```
 
-Le script installe Nginx, PHP-FPM, les extensions PHP nécessaires (`pgsql`, `xml`, `mbstring`, `curl`, `zip`, `bcmath`, `intl`, `redis`), Composer, Node.js 22, PostgreSQL, Redis, les services systemd et l’application dans `/opt/voice-guardian`.
+Le script installe Nginx, PHP-FPM, les extensions PHP nécessaires (`pgsql`, `xml`, `mbstring`, `curl`, `zip`, `bcmath`, `intl`, `redis`), Composer, Node.js 24, PostgreSQL, Redis, les services systemd et l’application dans `/opt/voice-guardian`.
 
 Si vous avez déjà cloné le projet et devez relancer manuellement les étapes Laravel :
 
