@@ -178,14 +178,28 @@ export class VoiceAssignmentManager {
         channelId: channel.id,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
-        daveEncryption: false,
+        debug: true,
         selfDeaf: false,
         selfMute: false,
       });
     }
 
     this.watchConnection(nextConnection, guild.id, channel.id);
-    await entersState(nextConnection, VoiceConnectionStatus.Ready, 25_000);
+    try {
+      await entersState(nextConnection, VoiceConnectionStatus.Ready, 25_000);
+    } catch (error) {
+      this.logError('voice_connection_ready_timeout', error);
+      this.audioRecorder.detach(guild.id);
+      this.activeChannels.delete(guild.id);
+      this.sessions.delete(guild.id);
+
+      if (nextConnection.state.status !== VoiceConnectionStatus.Destroyed) {
+        nextConnection.destroy();
+      }
+
+      throw error;
+    }
+
     this.logInfo('voice_joined', { guild_id: guild.id, channel_id: channel.id, channel_name: channel.name });
 
     const session = await this.api.createVoiceSession({
@@ -223,6 +237,18 @@ export class VoiceAssignmentManager {
       if (newState.status === VoiceConnectionStatus.Destroyed) {
         void this.cleanupDestroyedConnection(guildId, channelId);
       }
+    });
+
+    connection.on('debug', (message) => {
+      this.logInfo('voice_connection_debug', {
+        guild_id: guildId,
+        channel_id: channelId,
+        message,
+      });
+    });
+
+    connection.on('error', (error) => {
+      this.logError('voice_connection_error', error);
     });
   }
 
