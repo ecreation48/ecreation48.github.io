@@ -3,7 +3,9 @@ import { join } from 'node:path';
 
 const candidates = [
   join(process.cwd(), 'node_modules/@discordjs/voice/dist/index.js'),
+  join(process.cwd(), 'node_modules/@discordjs/voice/dist/index.mjs'),
   join(process.cwd(), 'apps/discord-manager/node_modules/@discordjs/voice/dist/index.js'),
+  join(process.cwd(), 'apps/discord-manager/node_modules/@discordjs/voice/dist/index.mjs'),
 ];
 
 const marker = 'this.sendHeartbeat();\n      this.debug?.("sent immediate heartbeat");';
