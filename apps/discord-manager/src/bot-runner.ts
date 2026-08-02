@@ -20,7 +20,7 @@ export class BotRunner {
   private broadcastRunner: VoiceBroadcastRunner | null = null;
   private transcriptionRunner: TranscriptionJobRunner | null = null;
   private channelSyncRunner: DiscordChannelSyncRunner | null = null;
-  private startedAt: Date | null = null;
+  private lastRestartRequestedAt: string | null;
   private readonly audioRecorder: AudioBufferRecorder;
   private readonly lock: RedisBotLock;
 
@@ -34,13 +34,13 @@ export class BotRunner {
   ) {
     this.lock = new RedisBotLock(redis, bot.id, ttlMs);
     this.audioRecorder = new AudioBufferRecorder(undefined, liveAudio);
+    this.lastRestartRequestedAt = bot.restart_requested_at ?? null;
   }
 
   async start(): Promise<boolean> {
     if (!await this.lock.acquire()) return false;
 
     try {
-      this.startedAt = new Date();
       const credentials = await this.api.credentials(this.bot.id);
 
       this.client = new Client({
@@ -72,10 +72,15 @@ export class BotRunner {
   }
 
   needsRestart(bot: BotSummary): boolean {
-    return bot.restart_requested_at !== undefined
-      && bot.restart_requested_at !== null
-      && this.startedAt !== null
-      && new Date(bot.restart_requested_at) > this.startedAt;
+    const requestedAt = bot.restart_requested_at ?? null;
+
+    if (requestedAt === null || requestedAt === this.lastRestartRequestedAt) {
+      return false;
+    }
+
+    this.lastRestartRequestedAt = requestedAt;
+
+    return true;
   }
 
   private async onReady(): Promise<void> {
