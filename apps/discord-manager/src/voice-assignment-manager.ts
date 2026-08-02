@@ -235,6 +235,7 @@ export class VoiceAssignmentManager {
       });
 
       if (newState.status === VoiceConnectionStatus.Disconnected) {
+        this.audioRecorder.detach(guildId);
         void this.enqueueGuild(
           guildId,
           () => this.recreateConnection(connection, guildId, channelId),
