@@ -12,6 +12,7 @@ export class VoiceAssignmentManager {
   private activeChannels = new Map<string, string>();
   private guildQueues = new Map<string, Promise<void>>();
   private watchedConnections = new WeakSet<VoiceConnection>();
+  private recoveringGuilds = new Set<string>();
 
   constructor(
     private readonly client: Client,
@@ -207,6 +208,9 @@ export class VoiceAssignmentManager {
   }
 
   private async recoverConnection(connection: VoiceConnection, guildId: string, channelId: string): Promise<void> {
+    if (this.recoveringGuilds.has(guildId)) return;
+    this.recoveringGuilds.add(guildId);
+
     try {
       await new Promise((resolve) => setTimeout(resolve, 1_000));
 
@@ -214,7 +218,7 @@ export class VoiceAssignmentManager {
 
       this.logInfo('voice_connection_rejoin_requested', { guild_id: guildId, channel_id: channelId });
       connection.rejoin();
-      await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+      await entersState(connection, VoiceConnectionStatus.Ready, 10_000);
       this.logInfo('voice_connection_recovered', { guild_id: guildId, channel_id: channelId });
     } catch (error) {
       this.logError('voice_connection_recover_failed', error);
@@ -222,6 +226,8 @@ export class VoiceAssignmentManager {
       if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
         connection.destroy();
       }
+    } finally {
+      this.recoveringGuilds.delete(guildId);
     }
   }
 
@@ -231,6 +237,7 @@ export class VoiceAssignmentManager {
     this.audioRecorder.detach(guildId);
     this.activeChannels.delete(guildId);
     this.leaveTimers.delete(channelId);
+    this.recoveringGuilds.delete(guildId);
 
     const sessionId = this.sessions.get(guildId);
     if (sessionId) {
@@ -270,7 +277,16 @@ export class VoiceAssignmentManager {
   }
 
   private async currentChannel(guildId: string): Promise<VoiceBasedChannel | null> {
-    const channelId = this.activeChannels.get(guildId) ?? getVoiceConnection(guildId)?.joinConfig.channelId;
+    const connection = getVoiceConnection(guildId);
+
+    if (
+      connection
+      && [VoiceConnectionStatus.Destroyed, VoiceConnectionStatus.Disconnected].includes(connection.state.status)
+    ) {
+      return null;
+    }
+
+    const channelId = this.activeChannels.get(guildId) ?? connection?.joinConfig.channelId;
     if (!channelId) return null;
 
     const guild = this.client.guilds.cache.get(guildId) ?? (await this.client.guilds.fetch(guildId).catch(() => null));
