@@ -17,7 +17,8 @@ class LiveVoiceChannelStreamController
         ignore_user_abort(false);
 
         $url = sprintf(
-            'http://127.0.0.1:%d/live/%s/%s',
+            'http://%s:%d/live/%s/%s',
+            config('services.worker.live_audio_host', '127.0.0.1'),
             (int) config('services.worker.live_audio_port', 8787),
             rawurlencode($discordChannel->guild->discord_id),
             rawurlencode($discordChannel->discord_id),
@@ -26,10 +27,11 @@ class LiveVoiceChannelStreamController
         $stream = $this->openStream($url);
 
         if ($stream === false) {
+            $host = config('services.worker.live_audio_host', '127.0.0.1');
             $port = (int) config('services.worker.live_audio_port', 8787);
 
             return response(
-                "Flux audio live indisponible sur le port {$port}. Relance le worker puis vérifie la Console worker : tu dois voir live_audio_server_started.",
+                "Flux audio live indisponible sur {$host}:{$port}. Relance le worker puis vérifie la Console worker : tu dois voir live_audio_server_started.",
                 503,
                 ['Content-Type' => 'text/plain; charset=UTF-8'],
             );

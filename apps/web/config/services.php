@@ -9,6 +9,7 @@ return [
         'redis_url' => env('REDIS_URL', 'redis://127.0.0.1:6379'),
         'command' => env('DISCORD_WORKER_COMMAND', '/opt/homebrew/bin/node ../../node_modules/tsx/dist/cli.mjs watch --exclude ../../node_modules --exclude node_modules src/index.ts'),
         'path' => env('DISCORD_WORKER_PATH', base_path('../discord-manager')),
+        'live_audio_host' => env('LIVE_AUDIO_HOST', '127.0.0.1'),
         'live_audio_port' => env('LIVE_AUDIO_PORT', 8787),
         'transcription_provider' => env('TRANSCRIPTION_PROVIDER'),
         'transcription_command' => env('TRANSCRIPTION_COMMAND'),
