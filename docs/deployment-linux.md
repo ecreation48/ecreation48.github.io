@@ -2,7 +2,7 @@
 
 Ce guide prépare un serveur Linux pour Voice Guardian avec Laravel/Filament, PostgreSQL, Redis, Nginx, le worker Discord Node.js et la transcription locale Whisper.
 
-La cible recommandée est Ubuntu 24.04 LTS. Le projet demande PHP 8.3 et Node.js 22.
+La cible recommandée est Ubuntu 24.04 LTS ou Debian 13/Trixie. Le projet demande PHP 8.3 minimum et Node.js 22.
 
 ## Installation complète
 
@@ -19,7 +19,7 @@ sudo REPO_URL=https://github.com/ecreation48/ecreation48.github.io.git bash scri
 Le script installe :
 
 - Nginx
-- PHP-FPM 8.3 et extensions Laravel
+- PHP-FPM disponible dans la distribution et extensions Laravel
 - Composer
 - Node.js 22
 - PostgreSQL
@@ -57,7 +57,7 @@ Après modification :
 
 ```bash
 sudo bash /opt/voice-guardian/scripts/linux/deploy.sh
-sudo systemctl restart voice-guardian-discord voice-guardian-queue php8.3-fpm nginx
+sudo systemctl restart voice-guardian-discord voice-guardian-queue nginx
 ```
 
 ## Créer le compte admin
@@ -188,7 +188,7 @@ sudo tail -f /opt/voice-guardian/apps/web/storage/logs/laravel.log
 
 ```bash
 curl -I http://127.0.0.1/admin
-sudo systemctl is-active nginx php8.3-fpm postgresql redis-server voice-guardian-discord voice-guardian-queue
+sudo systemctl is-active nginx postgresql redis-server voice-guardian-discord voice-guardian-queue
 sudo -u voiceguardian php /opt/voice-guardian/apps/web/artisan migrate:status
 ```
 

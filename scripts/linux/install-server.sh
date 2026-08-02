@@ -5,7 +5,7 @@ APP_DIR="${APP_DIR:-/opt/voice-guardian}"
 APP_USER="${APP_USER:-voiceguardian}"
 REPO_URL="${REPO_URL:-https://github.com/ecreation48/ecreation48.github.io.git}"
 BRANCH="${BRANCH:-main}"
-PHP_VERSION="${PHP_VERSION:-8.3}"
+PHP_VERSION="${PHP_VERSION:-}"
 DB_NAME="${DB_NAME:-voice_guardian}"
 DB_USER="${DB_USER:-voice_guardian}"
 DB_PASSWORD="${DB_PASSWORD:-}"
@@ -27,11 +27,60 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
+if [[ -n "$PHP_VERSION" ]] && apt-cache show "php${PHP_VERSION}-fpm" >/dev/null 2>&1; then
+  PHP_PACKAGES=(
+    "php${PHP_VERSION}-fpm"
+    "php${PHP_VERSION}-cli"
+    "php${PHP_VERSION}-pgsql"
+    "php${PHP_VERSION}-xml"
+    "php${PHP_VERSION}-mbstring"
+    "php${PHP_VERSION}-curl"
+    "php${PHP_VERSION}-zip"
+    "php${PHP_VERSION}-bcmath"
+    "php${PHP_VERSION}-redis"
+  )
+elif apt-cache show php-fpm >/dev/null 2>&1; then
+  PHP_PACKAGES=(
+    php-fpm
+    php-cli
+    php-pgsql
+    php-xml
+    php-mbstring
+    php-curl
+    php-zip
+    php-bcmath
+    php-redis
+  )
+else
+  echo "Aucun paquet PHP-FPM compatible n’a été trouvé dans les dépôts APT."
+  echo "Installe PHP >= 8.3 puis relance ce script."
+  exit 1
+fi
+
 apt-get install -y \
   ca-certificates curl git unzip build-essential cmake pkg-config ffmpeg nginx redis-server postgresql postgresql-contrib \
-  "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-cli" "php${PHP_VERSION}-pgsql" "php${PHP_VERSION}-xml" \
-  "php${PHP_VERSION}-mbstring" "php${PHP_VERSION}-curl" "php${PHP_VERSION}-zip" "php${PHP_VERSION}-bcmath" \
-  "php${PHP_VERSION}-redis"
+  "${PHP_PACKAGES[@]}"
+
+PHP_FPM_SERVICE="$(systemctl list-unit-files 'php*-fpm.service' --no-legend | awk '{print $1}' | sort -V | tail -n 1)"
+if [[ -z "$PHP_FPM_SERVICE" ]] && systemctl list-unit-files php-fpm.service --no-legend >/dev/null 2>&1; then
+  PHP_FPM_SERVICE="php-fpm.service"
+fi
+
+if [[ -z "$PHP_FPM_SERVICE" ]]; then
+  echo "Service PHP-FPM introuvable après installation."
+  exit 1
+fi
+
+PHP_FPM_SOCK="$(find /run/php -maxdepth 1 -type s -name 'php*-fpm.sock' 2>/dev/null | sort -V | tail -n 1)"
+if [[ -z "$PHP_FPM_SOCK" ]]; then
+  systemctl start "$PHP_FPM_SERVICE"
+  PHP_FPM_SOCK="$(find /run/php -maxdepth 1 -type s -name 'php*-fpm.sock' 2>/dev/null | sort -V | tail -n 1)"
+fi
+
+if [[ -z "$PHP_FPM_SOCK" ]]; then
+  echo "Socket PHP-FPM introuvable dans /run/php."
+  exit 1
+fi
 
 if ! command -v composer >/dev/null 2>&1; then
   EXPECTED_SIGNATURE="$(curl -fsSL https://composer.github.io/installer.sig)"
@@ -90,17 +139,19 @@ chmod 640 /etc/voice-guardian/*.env
 
 ln -sfn /etc/voice-guardian/web.env "$APP_DIR/apps/web/.env"
 
-cp "$APP_DIR/deploy/linux/nginx/voice-guardian.conf" /etc/nginx/sites-available/voice-guardian.conf
+sed "s#@@PHP_FPM_SOCK@@#$PHP_FPM_SOCK#g" "$APP_DIR/deploy/linux/nginx/voice-guardian.conf" > /etc/nginx/sites-available/voice-guardian.conf
 ln -sfn /etc/nginx/sites-available/voice-guardian.conf /etc/nginx/sites-enabled/voice-guardian.conf
 rm -f /etc/nginx/sites-enabled/default
 
-cp "$APP_DIR"/deploy/linux/systemd/*.service /etc/systemd/system/
+for service_file in "$APP_DIR"/deploy/linux/systemd/*.service; do
+  sed "s#@@PHP_FPM_SERVICE@@#$PHP_FPM_SERVICE#g" "$service_file" > "/etc/systemd/system/$(basename "$service_file")"
+done
 cp "$APP_DIR"/deploy/linux/systemd/*.timer /etc/systemd/system/
 systemctl daemon-reload
 
 bash "$APP_DIR/scripts/linux/deploy.sh"
 
-systemctl enable --now nginx "php${PHP_VERSION}-fpm" redis-server postgresql
+systemctl enable --now nginx "$PHP_FPM_SERVICE" redis-server postgresql
 systemctl enable --now voice-guardian-queue.service voice-guardian-scheduler.timer voice-guardian-discord.service
 
 echo

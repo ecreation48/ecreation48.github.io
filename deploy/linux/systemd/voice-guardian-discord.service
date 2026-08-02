@@ -1,6 +1,6 @@
 [Unit]
 Description=Voice Guardian Discord worker
-After=network-online.target redis-server.service postgresql.service nginx.service php8.3-fpm.service
+After=network-online.target redis-server.service postgresql.service nginx.service @@PHP_FPM_SERVICE@@
 Wants=network-online.target
 
 [Service]
