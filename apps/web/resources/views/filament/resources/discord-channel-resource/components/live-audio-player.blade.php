@@ -1,10 +1,4 @@
 @php
-    $streamUrl = sprintf(
-        'http://127.0.0.1:%d/live/%s/%s',
-        (int) config('services.worker.live_audio_port', 8787),
-        rawurlencode($channel->guild?->discord_id ?? ''),
-        rawurlencode($channel->discord_id),
-    );
     $proxyUrl = route('admin.voice-channels.live', $channel);
     $bot = $channel->bot;
     $worker = $bot?->workerInstance;
@@ -275,7 +269,7 @@
     x-data="{
         started: false,
         loadKey: Date.now(),
-        get source() { return '{{ $streamUrl }}?t=' + this.loadKey },
+        get source() { return '{{ $proxyUrl }}?t=' + this.loadKey },
         play() {
             this.started = true
             this.$nextTick(() => this.$refs.audio?.play().catch(() => {}))
