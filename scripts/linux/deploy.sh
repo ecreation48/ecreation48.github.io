@@ -38,7 +38,7 @@ sudo -u "$APP_USER" php apps/web/artisan view:cache
 systemctl restart voice-guardian-queue.service voice-guardian-discord.service || true
 systemctl reload nginx || systemctl restart nginx || true
 
-ADMIN_COUNT="$(sudo -u "$APP_USER" php apps/web/artisan tinker --execute="echo \App\Models\User::whereIn('role', ['super_admin', 'administrator', 'moderator'])->count();" 2>/dev/null || echo 0)"
+ADMIN_COUNT="$(sudo -u "$APP_USER" php apps/web/artisan tinker --execute="echo \App\Models\User::whereIn('role', ['super_admin', 'administrator'])->count();" 2>/dev/null || echo 0)"
 APP_URL="$(grep '^APP_URL=' /etc/voice-guardian/web.env | cut -d= -f2-)"
 
 echo "Déploiement terminé."
@@ -49,4 +49,6 @@ if [[ "$ADMIN_COUNT" == "0" ]]; then
   echo "Aucun utilisateur admin n'a été trouvé."
   echo "Crée le premier compte admin avec :"
   echo "sudo -u $APP_USER php $APP_DIR/apps/web/artisan make:filament-user"
+  echo "Ou promeus un compte existant avec :"
+  echo "sudo -u $APP_USER php $APP_DIR/apps/web/artisan user:promote-admin email@exemple.com"
 fi
