@@ -4,6 +4,9 @@ import type { AudioBufferRecorder } from './audio-buffer-recorder.js';
 import type { ApiClient, ChannelAssignment } from './api-client.js';
 
 const EMPTY_CHANNEL_GRACE_MS = 30_000;
+const voiceDebugEnabled = process.env.VOICE_DEBUG === 'true';
+const voiceDaveEncryptionEnabled = process.env.VOICE_DAVE_ENCRYPTION !== 'false';
+const voiceSelfDeafEnabled = process.env.VOICE_SELF_DEAF === 'true';
 
 export class VoiceAssignmentManager {
   private assignments = new Map<string, ChannelAssignment>();
@@ -178,9 +181,9 @@ export class VoiceAssignmentManager {
         channelId: channel.id,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
-        daveEncryption: false,
-        debug: true,
-        selfDeaf: false,
+        daveEncryption: voiceDaveEncryptionEnabled,
+        debug: voiceDebugEnabled,
+        selfDeaf: voiceSelfDeafEnabled,
         selfMute: false,
       });
     }
