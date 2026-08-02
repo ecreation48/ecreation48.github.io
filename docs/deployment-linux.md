@@ -190,7 +190,10 @@ sudo tail -f /opt/voice-guardian/apps/web/storage/logs/laravel.log
 curl -I http://127.0.0.1/admin
 sudo systemctl is-active nginx postgresql redis-server voice-guardian-discord voice-guardian-queue
 sudo -u voiceguardian php /opt/voice-guardian/apps/web/artisan migrate:status
+sudo -u postgres psql -l
 ```
+
+La base `voice_guardian` doit être en `UTF8`. Si elle est en `SQL_ASCII`, les pseudos Discord contenant des accents, apostrophes typographiques ou autres caractères Unicode peuvent provoquer des erreurs PostgreSQL sur les champs JSON.
 
 Test Whisper :
 

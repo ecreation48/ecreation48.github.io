@@ -121,7 +121,7 @@ chown -R "$APP_USER":www-data "$APP_DIR"
 git config --global --add safe.directory "$APP_DIR" || true
 
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname = '$DB_USER'" | grep -q 1 || sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';"
-sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
+sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || sudo -u postgres createdb -O "$DB_USER" --encoding=UTF8 --locale=C.UTF-8 --template=template0 "$DB_NAME"
 
 if [[ ! -f /etc/voice-guardian/web.env ]]; then
   cp "$APP_DIR/deploy/linux/web.env.example" /etc/voice-guardian/web.env
