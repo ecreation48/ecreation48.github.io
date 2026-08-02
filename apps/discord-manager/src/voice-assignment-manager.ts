@@ -278,6 +278,10 @@ export class VoiceAssignmentManager {
 
       if (newState.status === VoiceConnectionStatus.Disconnected) {
         this.audioRecorder.detach(guildId);
+
+        if (this.recoveringGuilds.has(guildId)) return;
+        this.recoveringGuilds.add(guildId);
+
         void this.enqueueGuild(
           guildId,
           () => this.recreateConnection(connection, guildId, channelId),
@@ -304,14 +308,11 @@ export class VoiceAssignmentManager {
   }
 
   private async recreateConnection(connection: VoiceConnection, guildId: string, channelId: string): Promise<void> {
-    if (this.recoveringGuilds.has(guildId)) return;
-    this.recoveringGuilds.add(guildId);
-
     try {
       await new Promise((resolve) => setTimeout(resolve, DISCONNECTED_RECOVERY_GRACE_MS));
 
       if (connection.state.status !== VoiceConnectionStatus.Disconnected) {
-        this.logInfo('voice_connection_recovered_without_recreate', {
+        this.logInfo('voice_connection_recreate_skipped', {
           guild_id: guildId,
           channel_id: channelId,
           status: connection.state.status,
