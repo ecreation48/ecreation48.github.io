@@ -84,9 +84,13 @@ if [[ -z "$PHP_FPM_SOCK" ]]; then
   exit 1
 fi
 
+if ! command -v composer >/dev/null 2>&1 && apt-cache show composer >/dev/null 2>&1; then
+  apt-get install -y composer
+fi
+
 if ! command -v composer >/dev/null 2>&1; then
-  EXPECTED_SIGNATURE="$(curl -fsSL https://composer.github.io/installer.sig)"
-  php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');"
+  EXPECTED_SIGNATURE="$(curl --connect-timeout 20 --max-time 120 -fsSL https://composer.github.io/installer.sig)"
+  curl --connect-timeout 20 --max-time 120 -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php
   ACTUAL_SIGNATURE="$(php -r "echo hash_file('sha384', '/tmp/composer-setup.php');")"
   if [[ "$EXPECTED_SIGNATURE" != "$ACTUAL_SIGNATURE" ]]; then
     echo "Signature Composer invalide."
