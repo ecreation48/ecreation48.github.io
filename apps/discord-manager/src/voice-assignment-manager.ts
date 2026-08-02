@@ -318,11 +318,7 @@ export class VoiceAssignmentManager {
     closeCode: number | null,
   ): Promise<void> {
     try {
-      const expectedRecoveryStatus = reason === VoiceConnectionDisconnectReason.WebSocketClose && closeCode === 4014
-        ? VoiceConnectionStatus.Signalling
-        : VoiceConnectionStatus.Ready;
-
-      await entersState(connection, expectedRecoveryStatus, DISCONNECTED_RECOVERY_GRACE_MS);
+      await this.waitForConnectionRecovery(connection, reason, closeCode);
 
       if (connection.state.status !== VoiceConnectionStatus.Disconnected) {
         this.logInfo('voice_connection_recreate_skipped', {
@@ -361,6 +357,31 @@ export class VoiceAssignmentManager {
     } finally {
       this.recoveringGuilds.delete(guildId);
     }
+  }
+
+  private async waitForConnectionRecovery(
+    connection: VoiceConnection,
+    reason: number | null,
+    closeCode: number | null,
+  ): Promise<void> {
+    const waitFor = (status: VoiceConnectionStatus) =>
+      entersState(connection, status, DISCONNECTED_RECOVERY_GRACE_MS).catch(() => new Promise<never>(() => undefined));
+
+    const timeout = new Promise((resolve) => setTimeout(resolve, DISCONNECTED_RECOVERY_GRACE_MS));
+
+    if (reason === VoiceConnectionDisconnectReason.WebSocketClose && closeCode === 4014) {
+      await Promise.race([
+        waitFor(VoiceConnectionStatus.Signalling),
+        waitFor(VoiceConnectionStatus.Connecting),
+        timeout,
+      ]);
+      return;
+    }
+
+    await Promise.race([
+      waitFor(VoiceConnectionStatus.Ready),
+      timeout,
+    ]);
   }
 
   private async cleanupDestroyedConnection(guildId: string, channelId: string): Promise<void> {
