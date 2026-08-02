@@ -83,6 +83,123 @@ Voir [l'architecture](docs/architecture.md) et [l'API interne](docs/openapi.yaml
 
 Une version prête pour VPS Linux est disponible dans [docs/deployment-linux.md](docs/deployment-linux.md).
 
+### Installation complète Debian/Ubuntu
+
+Ces commandes sont prévues pour un VPS Debian 13/Trixie ou Ubuntu 24.04, connecté en `root`.
+
+```bash
+apt-get update
+apt-get install -y sudo git ca-certificates curl unzip
+
+git clone https://github.com/ecreation48/ecreation48.github.io.git /tmp/voice-guardian-install
+cd /tmp/voice-guardian-install
+
+REPO_URL=https://github.com/ecreation48/ecreation48.github.io.git bash scripts/linux/install-server.sh
+```
+
+Le script installe Nginx, PHP-FPM, les extensions PHP nécessaires (`pgsql`, `xml`, `mbstring`, `curl`, `zip`, `bcmath`, `intl`, `redis`), Composer, Node.js 22, PostgreSQL, Redis, les services systemd et l’application dans `/opt/voice-guardian`.
+
+Si vous avez déjà cloné le projet et devez relancer manuellement les étapes Laravel :
+
+```bash
+apt-get update
+apt-get install -y php-fpm php-cli php-pgsql php-xml php-mbstring php-curl php-zip php-bcmath php-intl php-redis unzip curl git
+
+cd /opt/voice-guardian/apps/web
+sudo -u voiceguardian composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+sudo -u voiceguardian php artisan key:generate --force
+sudo -u voiceguardian php artisan migrate --force
+sudo -u voiceguardian php artisan filament:assets
+sudo -u voiceguardian php artisan optimize:clear
+sudo -u voiceguardian php artisan config:cache
+sudo -u voiceguardian php artisan route:cache
+sudo -u voiceguardian php artisan view:cache
+```
+
+Si la page affiche encore la page par défaut Nginx, activez le vhost Voice Guardian :
+
+```bash
+cat > /etc/nginx/sites-available/voice-guardian.conf <<'EOF'
+server {
+    listen 80 default_server;
+    server_name _;
+
+    root /opt/voice-guardian/apps/web/public;
+    index index.php;
+
+    client_max_body_size 128m;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_param DOCUMENT_ROOT $realpath_root;
+    }
+
+    location ~ /\. {
+        deny all;
+    }
+}
+EOF
+
+rm -f /etc/nginx/sites-enabled/default
+ln -sfn /etc/nginx/sites-available/voice-guardian.conf /etc/nginx/sites-enabled/voice-guardian.conf
+nginx -t
+systemctl reload nginx
+```
+
+Créez ensuite le premier compte admin :
+
+```bash
+sudo -u voiceguardian php /opt/voice-guardian/apps/web/artisan make:filament-user
+```
+
+L’admin est disponible sur :
+
+```text
+http://IP_DU_SERVEUR/admin
+```
+
+Pour installer Whisper local :
+
+```bash
+apt-get update
+apt-get install -y build-essential cmake git ffmpeg
+bash /opt/voice-guardian/scripts/linux/install-whisper.sh
+systemctl restart voice-guardian-discord
+```
+
+Commandes utiles :
+
+```bash
+/opt/voice-guardian/scripts/linux/voice-guardian.sh status
+/opt/voice-guardian/scripts/linux/voice-guardian.sh logs
+journalctl -u voice-guardian-discord -f
+tail -f /opt/voice-guardian/apps/web/storage/logs/laravel.log
+```
+
+Diagnostic rapide en cas de 500 :
+
+```bash
+tail -n 120 /opt/voice-guardian/apps/web/storage/logs/laravel.log
+cd /opt/voice-guardian/apps/web
+sudo -u voiceguardian php artisan about
+sudo -u voiceguardian php artisan migrate:status
+ls -la /opt/voice-guardian/apps/web/storage /opt/voice-guardian/apps/web/bootstrap/cache
+```
+
+Pour HTTPS avec un domaine :
+
+```bash
+apt-get update
+apt-get install -y certbot python3-certbot-nginx
+certbot --nginx -d votre-domaine.fr
+```
+
 Les fichiers utiles sont :
 
 - `scripts/linux/install-server.sh`
