@@ -111,12 +111,14 @@ install -d -o "$APP_USER" -g www-data /etc/voice-guardian "$APP_DIR"
 if [[ ! -d "$APP_DIR/.git" ]]; then
   git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
 else
+  git config --global --add safe.directory "$APP_DIR" || true
   git -C "$APP_DIR" fetch origin "$BRANCH"
   git -C "$APP_DIR" checkout "$BRANCH"
   git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
 fi
 
 chown -R "$APP_USER":www-data "$APP_DIR"
+git config --global --add safe.directory "$APP_DIR" || true
 
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname = '$DB_USER'" | grep -q 1 || sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';"
 sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
