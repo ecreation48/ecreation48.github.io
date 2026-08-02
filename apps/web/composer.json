@@ -1,7 +1,11 @@
 {
   "name":"voice-guardian/web","type":"project",
   "require":{"php":"^8.3","laravel/framework":"^12.0","laravel/sanctum":"^4.0","filament/filament":"^3.3","predis/predis":"^2.2"},
-  "require-dev":{"laravel/pint":"^1.18","pestphp/pest":"^3.7","pestphp/pest-plugin-laravel":"^3.0"},
+  "require-dev":{"laravel/pint":"^1.18","mockery/mockery":"^1.6","pestphp/pest":"^3.7","pestphp/pest-plugin-laravel":"^3.0"},
   "autoload":{"psr-4":{"App\\":"app/","Database\\Factories\\":"database/factories/","Database\\Seeders\\":"database/seeders/"}},
-  "scripts":{"test":"php artisan test"},"config":{"sort-packages":true,"allow-plugins":{"pestphp/pest-plugin":true}}
+  "autoload-dev":{"psr-4":{"Tests\\":"tests/"}},
+  "scripts":{
+    "test":"php artisan test",
+    "serve:local":"php -d upload_max_filesize=64M -d post_max_size=72M -d memory_limit=256M artisan serve --host=127.0.0.1 --port=8001"
+  },"config":{"sort-packages":true,"allow-plugins":{"pestphp/pest-plugin":true}}
 }

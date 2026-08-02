@@ -5,5 +5,5 @@ WORKDIR /var/www
 COPY apps/web/composer.* ./
 RUN composer install --no-dev --no-interaction --prefer-dist --no-scripts
 COPY apps/web .
-RUN composer dump-autoload --optimize && mkdir -p storage/framework/{cache,sessions,views} bootstrap/cache && chown -R www-data:www-data storage bootstrap/cache
+RUN composer dump-autoload --optimize && php artisan filament:assets && mkdir -p storage/framework/{cache,sessions,views} bootstrap/cache && chown -R www-data:www-data storage bootstrap/cache public/css public/js
 CMD ["php-fpm", "-F"]

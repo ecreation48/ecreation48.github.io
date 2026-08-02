@@ -4,6 +4,14 @@
 **/node_modules/
 **/.phpunit.cache/
 **/storage/*.key
+**/database/*.sqlite
+**/storage/app/*
+**/storage/audio-clips/*
+**/storage/framework/*
 **/storage/logs/*
+!**/storage/**/.gitignore
 !/apps/web/storage/logs/.gitignore
 **/dist/
+/tools/whisper.cpp/
+apps/discord-manager/discord-auto-move/
+apps/web/.php/

@@ -4,4 +4,5 @@ set -eu
 docker compose build
 docker compose run --rm laravel php artisan key:generate
 docker compose run --rm laravel php artisan migrate --force
+docker compose run --rm laravel php artisan filament:assets
 docker compose up -d

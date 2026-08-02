@@ -1,0 +1,6 @@
+<?php
+namespace App\Filament\Resources\VoiceReportResource\RelationManagers;
+use Filament\Forms\Form; use Filament\Resources\RelationManagers\RelationManager; use Filament\Tables; use Filament\Tables\Table;
+class ActionsRelationManager extends RelationManager { protected static string $relationship='actions'; protected static ?string $title='Actions';
+ public function form(Form $form): Form{return $form->schema([]);}
+ public function table(Table $table): Table{return $table->columns([Tables\Columns\TextColumn::make('actioned_at')->label('Action le')->dateTime()->sortable(),Tables\Columns\TextColumn::make('type')->label('Type')->formatStateUsing(fn(string $state):string=>match($state){'warn'=>'Avertissement','disconnect'=>'Déconnexion vocale','move'=>'Déplacement','mute'=>'Mute serveur','timeout'=>'Timeout','kick'=>'Expulsion','ban'=>'Bannissement','note'=>'Note','dismiss'=>'Classement sans suite','delete_audio'=>'Suppression audio',default=>$state})->badge(),Tables\Columns\TextColumn::make('target_user_discord_id')->label('Utilisateur')->copyable(),Tables\Columns\TextColumn::make('result')->label('Résultat')->formatStateUsing(fn(string $state):string=>match($state){'pending'=>'En attente','recorded'=>'Enregistré','success'=>'Succès','failed'=>'Échec',default=>$state})->badge(),Tables\Columns\TextColumn::make('reason')->label('Motif')->limit(80)]);}}

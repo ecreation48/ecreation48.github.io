@@ -1,0 +1,3 @@
+<?php
+namespace App\Filament\Resources\VoiceSessionResource\Pages; use App\Filament\Resources\VoiceSessionResource; use Filament\Actions; use Filament\Resources\Pages\EditRecord;
+class EditVoiceSession extends EditRecord {protected static string $resource=VoiceSessionResource::class; protected function getHeaderActions():array{return [Actions\Action::make('end')->label('Terminer')->icon('heroicon-o-stop-circle')->color('danger')->requiresConfirmation()->visible(fn():bool=>$this->record->ended_at===null)->action(fn()=> $this->record->update(['status'=>'ended','ended_at'=>now(),'last_activity_at'=>now()]))];}}

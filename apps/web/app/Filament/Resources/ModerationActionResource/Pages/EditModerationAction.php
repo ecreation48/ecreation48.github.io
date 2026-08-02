@@ -1,0 +1,3 @@
+<?php
+namespace App\Filament\Resources\ModerationActionResource\Pages; use App\Filament\Resources\ModerationActionResource; use Filament\Actions; use Filament\Resources\Pages\EditRecord;
+class EditModerationAction extends EditRecord {protected static string $resource=ModerationActionResource::class; protected function getHeaderActions():array{return [Actions\Action::make('retry')->label('Réessayer')->icon('heroicon-o-arrow-path')->visible(fn():bool=>$this->record->result==='failed')->action(fn()=> $this->record->update(['result'=>'pending','error_message'=>null])),Actions\DeleteAction::make()];}}

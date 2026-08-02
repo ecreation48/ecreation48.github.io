@@ -1,0 +1,9 @@
+[Unit]
+Description=Voice Guardian Laravel scheduler tick
+
+[Service]
+Type=oneshot
+User=voiceguardian
+Group=www-data
+WorkingDirectory=/opt/voice-guardian/apps/web
+ExecStart=/usr/bin/php artisan schedule:run

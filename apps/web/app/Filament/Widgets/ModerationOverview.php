@@ -1,0 +1,6 @@
+<?php
+namespace App\Filament\Widgets;
+use App\Models\DiscordBot; use App\Models\DiscordChannel; use App\Models\DiscordGuild; use App\Models\VoiceEvent; use App\Models\VoiceReport; use App\Models\VoiceSession; use Filament\Widgets\StatsOverviewWidget; use Filament\Widgets\StatsOverviewWidget\Stat;
+class ModerationOverview extends StatsOverviewWidget { protected static ?string $pollingInterval='5s';
+ protected function getStats(): array {return [Stat::make('Bots actifs',DiscordBot::query()->where('is_active',true)->count())->description(DiscordBot::query()->where('connection_status','online')->count().' en ligne'),Stat::make('Serveurs',DiscordGuild::query()->count())->description('Configurés dans la plateforme'),Stat::make('Salons surveillés',DiscordChannel::query()->where('is_monitored',true)->whereIn('type',['voice','stage'])->count())->description('Voix et stages'),Stat::make('Sessions actives',VoiceSession::query()->whereNull('ended_at')->count())->description('Mises à jour en temps réel'),Stat::make('Signalements en attente',VoiceReport::query()->where('status','pending')->count())->description('À traiter'),Stat::make('Événements vocaux',VoiceEvent::query()->where('occurred_at','>=',now()->subHour())->count())->description('Dernière heure')];}
+}

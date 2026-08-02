@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Voice Guardian Laravel scheduler every minute
+
+[Timer]
+OnCalendar=*:0/1
+Persistent=true
+Unit=voice-guardian-scheduler.service
+
+[Install]
+WantedBy=timers.target

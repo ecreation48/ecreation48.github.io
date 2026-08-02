@@ -1,0 +1,19 @@
+[Unit]
+Description=Voice Guardian Discord worker
+After=network-online.target redis-server.service postgresql.service nginx.service php8.3-fpm.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=voiceguardian
+Group=www-data
+WorkingDirectory=/opt/voice-guardian/apps/discord-manager
+EnvironmentFile=/etc/voice-guardian/worker.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
