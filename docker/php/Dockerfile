@@ -1,4 +1,4 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.4-fpm-alpine
 RUN apk add --no-cache git unzip icu-dev libpq-dev libzip-dev $PHPIZE_DEPS \
     && docker-php-ext-install intl pdo_pgsql zip
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
