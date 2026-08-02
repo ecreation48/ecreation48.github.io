@@ -21,6 +21,10 @@ export class VoiceAssignmentManager {
 
   setAssignments(assignments: ChannelAssignment[]): void {
     this.assignments = new Map(assignments.map((assignment) => [assignment.channel_discord_id, assignment]));
+    this.logInfo('voice_assignments_refreshed', {
+      assignment_count: assignments.length,
+      guild_count: new Set(assignments.map((assignment) => assignment.guild_discord_id)).size,
+    });
 
     for (const [channelId, timer] of this.leaveTimers) {
       if (!this.assignments.has(channelId)) {
@@ -50,6 +54,12 @@ export class VoiceAssignmentManager {
     for (const [guildId, assignments] of assignmentsByGuild) {
       await this.enqueueGuild(guildId, async () => {
         const current = await this.currentChannel(guildId);
+        this.logInfo('voice_guild_reconcile', {
+          guild_id: guildId,
+          assignment_count: assignments.length,
+          current_channel_id: current?.id ?? null,
+          current_human_member_count: current ? this.humanMembers(current).length : 0,
+        });
 
         if (current && this.hasHumanMembers(current)) {
           await this.heartbeatCurrent(guildId, current).catch((error) => this.logError('voice_session_heartbeat_failed', error));
@@ -62,6 +72,11 @@ export class VoiceAssignmentManager {
           await this.switchTo(next);
           return;
         }
+
+        this.logInfo('voice_no_active_channel_found', {
+          guild_id: guildId,
+          assignment_count: assignments.length,
+        });
 
         if (current) await this.scheduleLeave(current);
       }, 'voice_guild_reconcile_failed');
@@ -224,7 +239,23 @@ export class VoiceAssignmentManager {
       const guild = this.client.guilds.cache.get(assignment.guild_discord_id) ?? (await this.client.guilds.fetch(assignment.guild_discord_id).catch(() => null));
       const channel = guild?.channels.cache.get(assignment.channel_discord_id) ?? (await guild?.channels.fetch(assignment.channel_discord_id).catch(() => null));
 
-      if (channel?.isVoiceBased() && this.hasHumanMembers(channel)) return assignment;
+      if (!channel?.isVoiceBased()) {
+        this.logInfo('voice_assignment_unavailable', {
+          guild_id: assignment.guild_discord_id,
+          channel_id: assignment.channel_discord_id,
+        });
+        continue;
+      }
+
+      const members = this.humanMembers(channel);
+      this.logInfo('voice_assignment_checked', {
+        guild_id: assignment.guild_discord_id,
+        channel_id: assignment.channel_discord_id,
+        channel_name: channel.name,
+        human_member_count: members.length,
+      });
+
+      if (members.length > 0) return assignment;
     }
 
     return null;
