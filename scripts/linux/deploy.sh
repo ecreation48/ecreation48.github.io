@@ -22,6 +22,7 @@ chmod -R ug+rwX apps/web/storage apps/web/bootstrap/cache apps/discord-manager/s
 
 sudo -u "$APP_USER" composer install --working-dir=apps/web --no-dev --prefer-dist --no-interaction --optimize-autoloader
 sudo -u "$APP_USER" npm ci
+sudo -u "$APP_USER" node scripts/patch-discord-voice-heartbeat.mjs
 sudo -u "$APP_USER" npm -w apps/discord-manager run build
 
 PHP_FPM_SERVICE="$(systemctl list-unit-files 'php*-fpm.service' --no-legend | awk '{print $1}' | sort -V | tail -n 1)"
