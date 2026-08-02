@@ -231,7 +231,11 @@ export class VoiceAssignmentManager {
       });
 
       if (newState.status === VoiceConnectionStatus.Disconnected) {
-        void this.recreateConnection(connection, guildId, channelId);
+        void this.enqueueGuild(
+          guildId,
+          () => this.recreateConnection(connection, guildId, channelId),
+          'voice_connection_recreate_failed',
+        );
       }
 
       if (newState.status === VoiceConnectionStatus.Destroyed) {
@@ -269,11 +273,11 @@ export class VoiceAssignmentManager {
 
       await this.switchTo(assignment);
     } catch (error) {
-      this.logError('voice_connection_recreate_failed', error);
-
       if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
         connection.destroy();
       }
+
+      throw error;
     } finally {
       this.recoveringGuilds.delete(guildId);
     }
