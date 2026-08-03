@@ -47,6 +47,8 @@ AUTHENTIK_TOKEN_AUTH_METHOD=client_secret_post
 
 Callback à déclarer dans Authentik : `https://votre-domaine.fr/auth/sso/callback`.
 
+Quand le SSO est activé, `/admin/login` redirige automatiquement vers Authentik. Le login local reste disponible sur `/login/manuel`.
+
 ## Développement
 
 ```bash

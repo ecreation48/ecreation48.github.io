@@ -76,7 +76,13 @@ URL de redirection à déclarer dans Authentik :
 https://votre-domaine.fr/auth/sso/callback
 ```
 
-Le bouton affiché sur `/admin/login` s’appelle **Connexion SSO**. Les utilisateurs SSO sont créés automatiquement avec le rôle défini par `AUTHENTIK_DEFAULT_ROLE`; le rôle peut ensuite être modifié depuis **Configuration > Utilisateurs**.
+Quand `AUTHENTIK_SSO_ENABLED=true`, `/admin/login` bascule automatiquement vers Authentik. La connexion locale reste disponible sur :
+
+```text
+https://votre-domaine.fr/login/manuel
+```
+
+Les utilisateurs SSO sont créés automatiquement avec le rôle défini par `AUTHENTIK_DEFAULT_ROLE`; le rôle peut ensuite être modifié depuis **Configuration > Utilisateurs**.
 
 Après modification :
 
