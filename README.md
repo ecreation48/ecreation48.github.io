@@ -32,6 +32,21 @@ sudo bash /opt/voice-guardian/scripts/linux/deploy.sh
 
 Le guide complet est disponible dans [docs/deployment-linux.md](docs/deployment-linux.md).
 
+### Authentification SSO Authentik
+
+Le login Filament peut afficher un bouton **Connexion SSO** via Authentik. À configurer dans `/etc/voice-guardian/web.env` :
+
+```dotenv
+AUTHENTIK_SSO_ENABLED=true
+AUTHENTIK_BASE_URL=https://auth.kinoah2k.com:4443
+AUTHENTIK_ISSUER_URL=https://auth.kinoah2k.com:4443/application/o/SLUG_APPLICATION/
+AUTHENTIK_CLIENT_ID=...
+AUTHENTIK_CLIENT_SECRET=...
+AUTHENTIK_TOKEN_AUTH_METHOD=client_secret_post
+```
+
+Callback à déclarer dans Authentik : `https://votre-domaine.fr/auth/sso/callback`.
+
 ## Développement
 
 ```bash

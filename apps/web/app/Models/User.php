@@ -15,7 +15,7 @@ class User extends Authenticatable implements FilamentUser
     use HasUuid;
     use Notifiable;
 
-    protected $fillable = ['name', 'email', 'password', 'role'];
+    protected $fillable = ['name', 'email', 'password', 'role', 'sso_provider', 'sso_provider_id', 'last_login_at'];
     protected $hidden = ['password', 'remember_token'];
 
     protected static function booted(): void
@@ -35,6 +35,7 @@ class User extends Authenticatable implements FilamentUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'password' => 'hashed',
         ];
     }

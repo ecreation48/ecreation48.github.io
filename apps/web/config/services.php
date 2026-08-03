@@ -20,4 +20,15 @@ return [
         'openai_base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
         'openai_transcription_model' => env('OPENAI_TRANSCRIPTION_MODEL', 'whisper-1'),
     ],
+
+    'authentik' => [
+        'enabled' => env('AUTHENTIK_SSO_ENABLED', false),
+        'base_url' => rtrim(env('AUTHENTIK_BASE_URL', 'https://auth.kinoah2k.com:4443'), '/'),
+        'issuer_url' => rtrim(env('AUTHENTIK_ISSUER_URL', env('AUTHENTIK_BASE_URL', 'https://auth.kinoah2k.com:4443')), '/'),
+        'client_id' => env('AUTHENTIK_CLIENT_ID'),
+        'client_secret' => env('AUTHENTIK_CLIENT_SECRET'),
+        'token_auth_method' => env('AUTHENTIK_TOKEN_AUTH_METHOD', 'client_secret_post'),
+        'scopes' => env('AUTHENTIK_SCOPES', 'openid email profile'),
+        'default_role' => env('AUTHENTIK_DEFAULT_ROLE', 'viewer'),
+    ],
 ];

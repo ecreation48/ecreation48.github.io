@@ -78,6 +78,12 @@ class UserResource extends Resource
                         ->maxLength(255)
                         ->columnSpanFull()
                         ->helperText('Laisse vide en édition pour conserver le mot de passe actuel.'),
+                    Forms\Components\TextInput::make('sso_provider')
+                        ->label('Fournisseur SSO')
+                        ->disabled(),
+                    Forms\Components\TextInput::make('sso_provider_id')
+                        ->label('Identifiant SSO')
+                        ->disabled(),
                 ]),
         ]);
     }
@@ -111,6 +117,16 @@ class UserResource extends Resource
                     ->label('Vérifié')
                     ->boolean()
                     ->state(fn (User $record): bool => filled($record->email_verified_at)),
+                Tables\Columns\TextColumn::make('sso_provider')
+                    ->label('SSO')
+                    ->placeholder('Local')
+                    ->badge()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('last_login_at')
+                    ->label('Dernière connexion')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Créé le')
                     ->dateTime('d/m/Y H:i')

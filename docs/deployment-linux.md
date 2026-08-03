@@ -55,6 +55,29 @@ VOICE_AUDIO_CAPTURE=true
 VOICE_AUDIO_CAPTURE_DELAY_MS=3000
 ```
 
+### Connexion SSO Authentik
+
+Créez une application/provideur OAuth2/OpenID Connect dans Authentik, puis configurez :
+
+```dotenv
+AUTHENTIK_SSO_ENABLED=true
+AUTHENTIK_BASE_URL=https://auth.kinoah2k.com:4443
+AUTHENTIK_ISSUER_URL=https://auth.kinoah2k.com:4443/application/o/SLUG_APPLICATION/
+AUTHENTIK_CLIENT_ID=client-id-authentik
+AUTHENTIK_CLIENT_SECRET=client-secret-authentik
+AUTHENTIK_TOKEN_AUTH_METHOD=client_secret_post
+AUTHENTIK_SCOPES="openid email profile"
+AUTHENTIK_DEFAULT_ROLE=viewer
+```
+
+URL de redirection à déclarer dans Authentik :
+
+```text
+https://votre-domaine.fr/auth/sso/callback
+```
+
+Le bouton affiché sur `/admin/login` s’appelle **Connexion SSO**. Les utilisateurs SSO sont créés automatiquement avec le rôle défini par `AUTHENTIK_DEFAULT_ROLE`; le rôle peut ensuite être modifié depuis **Configuration > Utilisateurs**.
+
 Après modification :
 
 ```bash
