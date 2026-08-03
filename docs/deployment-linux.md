@@ -68,6 +68,9 @@ AUTHENTIK_CLIENT_SECRET=client-secret-authentik
 AUTHENTIK_TOKEN_AUTH_METHOD=client_secret_post
 AUTHENTIK_SCOPES="openid email profile"
 AUTHENTIK_DEFAULT_ROLE=viewer
+AUTHENTIK_ADMIN_GROUP=kino_administrateurs
+AUTHENTIK_RESPONSABLE_GROUP=kino_responsables
+AUTHENTIK_MODERATOR_GROUP=kino_moderateur
 ```
 
 URL de redirection à déclarer dans Authentik :
@@ -83,6 +86,22 @@ https://votre-domaine.fr/login/manuel
 ```
 
 Les utilisateurs SSO sont créés automatiquement avec le rôle défini par `AUTHENTIK_DEFAULT_ROLE`; le rôle peut ensuite être modifié depuis **Configuration > Utilisateurs**.
+
+Mapping des groupes Authentik :
+
+```text
+kino_administrateurs -> Super admin
+kino_responsables    -> Responsable
+kino_moderateur      -> Kinomodérateur
+```
+
+Droits appliqués :
+
+```text
+Super admin     -> toute l'administration, configuration, bots, utilisateurs
+Responsable     -> signalements, sanctions, mots interdits, salons vocaux
+Kinomodérateur  -> signalements et activité vocale
+```
 
 Après modification :
 

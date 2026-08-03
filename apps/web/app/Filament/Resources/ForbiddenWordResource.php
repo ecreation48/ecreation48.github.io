@@ -21,6 +21,26 @@ class ForbiddenWordResource extends Resource
     protected static ?string $navigationGroup = 'Modération';
     protected static ?int $navigationSort = 35;
 
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->canApplySanctions() ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->canApplySanctions() ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->canApplySanctions() ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([

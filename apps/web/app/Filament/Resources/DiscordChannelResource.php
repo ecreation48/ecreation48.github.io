@@ -24,6 +24,26 @@ class DiscordChannelResource extends Resource
     protected static ?string $navigationLabel = 'Salons vocaux';
     protected static ?string $navigationGroup = 'Discord';
 
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->canManageChannels() ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->canManageChannels() ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->canManageChannels() ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([

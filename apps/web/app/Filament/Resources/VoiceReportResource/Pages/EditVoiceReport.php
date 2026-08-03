@@ -68,7 +68,7 @@ class EditVoiceReport extends EditRecord
                     ->icon('heroicon-o-speaker-x-mark')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (): bool => $this->record->recording !== null)
+                    ->visible(fn (): bool => $this->record->recording !== null && (auth()->user()?->canApplySanctions() ?? false))
                     ->action(function (): void {
                         $this->record->recording?->delete();
                         $this->record->refresh();
@@ -86,7 +86,7 @@ class EditVoiceReport extends EditRecord
 
                         Notification::make()->title('Signalement classé sans suite')->success()->send();
                     }),
-                Actions\DeleteAction::make()->label('Supprimer'),
+                Actions\DeleteAction::make()->label('Supprimer')->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false),
             ])
                 ->label('Plus')
                 ->icon('heroicon-o-ellipsis-horizontal')
@@ -100,6 +100,7 @@ class EditVoiceReport extends EditRecord
         return Actions\Action::make($type)
             ->label($label)
             ->icon($icon)
+            ->visible(fn (): bool => auth()->user()?->canApplySanctions() ?? false)
             ->form([
                 Forms\Components\Textarea::make('reason')
                     ->label('Motif')

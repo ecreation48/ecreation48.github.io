@@ -30,5 +30,8 @@ return [
         'token_auth_method' => env('AUTHENTIK_TOKEN_AUTH_METHOD', 'client_secret_post'),
         'scopes' => env('AUTHENTIK_SCOPES', 'openid email profile'),
         'default_role' => env('AUTHENTIK_DEFAULT_ROLE', 'viewer'),
+        'admin_group' => env('AUTHENTIK_ADMIN_GROUP', 'kino_administrateurs'),
+        'responsable_group' => env('AUTHENTIK_RESPONSABLE_GROUP', 'kino_responsables'),
+        'moderator_group' => env('AUTHENTIK_MODERATOR_GROUP', 'kino_moderateur'),
     ],
 ];

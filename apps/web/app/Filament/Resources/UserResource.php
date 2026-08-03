@@ -24,7 +24,7 @@ class UserResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return in_array(Auth::user()?->role, ['super_admin', 'administrator'], true);
+        return Auth::user()?->canManageConfiguration() ?? false;
     }
 
     public static function canCreate(): bool
@@ -159,8 +159,8 @@ class UserResource extends Resource
     {
         return [
             'super_admin' => 'Super admin',
-            'administrator' => 'Administrateur',
-            'moderator' => 'Modérateur',
+            'administrator' => 'Responsable',
+            'moderator' => 'Kinomodérateur',
             'reviewer' => 'Relecteur',
             'viewer' => 'Observateur',
         ];
@@ -172,12 +172,12 @@ class UserResource extends Resource
             return false;
         }
 
-        if (! in_array($user->role, ['super_admin', 'administrator'], true)) {
+        if ($user->role !== 'super_admin') {
             return true;
         }
 
         return User::query()
-            ->whereIn('role', ['super_admin', 'administrator'])
+            ->where('role', 'super_admin')
             ->whereKeyNot($user->getKey())
             ->exists();
     }

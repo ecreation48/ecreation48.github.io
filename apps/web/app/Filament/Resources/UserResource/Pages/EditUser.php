@@ -24,8 +24,8 @@ class EditUser extends EditRecord
     protected function beforeSave(): void
     {
         $newRole = $this->form->getState()['role'] ?? $this->record->role;
-        $wasPrivileged = in_array($this->record->role, ['super_admin', 'administrator'], true);
-        $willBePrivileged = in_array($newRole, ['super_admin', 'administrator'], true);
+        $wasPrivileged = $this->record->role === 'super_admin';
+        $willBePrivileged = $newRole === 'super_admin';
 
         if ($wasPrivileged && ! $willBePrivileged && $this->lastPrivilegedUser()) {
             Notification::make()
@@ -41,7 +41,7 @@ class EditUser extends EditRecord
     private function lastPrivilegedUser(): bool
     {
         return User::query()
-            ->whereIn('role', ['super_admin', 'administrator'])
+            ->where('role', 'super_admin')
             ->whereKeyNot($this->record->getKey())
             ->doesntExist();
     }

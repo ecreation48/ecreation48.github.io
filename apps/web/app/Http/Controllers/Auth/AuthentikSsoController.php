@@ -75,6 +75,7 @@ class AuthentikSsoController extends Controller
             ->get($discovery['userinfo_endpoint'])
             ->throw()
             ->json();
+        $profile = array_merge($this->idTokenPayload((string) ($token['id_token'] ?? '')), $profile);
 
         $email = strtolower((string) ($profile['email'] ?? ''));
         $subject = (string) ($profile['sub'] ?? '');
@@ -94,7 +95,7 @@ class AuthentikSsoController extends Controller
             'email_verified_at' => ($profile['email_verified'] ?? false) ? now() : $user->email_verified_at,
             'sso_provider' => 'authentik',
             'sso_provider_id' => $subject,
-            'role' => $user->exists ? $user->role : config('services.authentik.default_role'),
+            'role' => $this->roleFromGroups($profile),
             'last_login_at' => now(),
         ])->save();
 
@@ -125,5 +126,40 @@ class AuthentikSsoController extends Controller
             ->get($issuer.'/.well-known/openid-configuration')
             ->throw()
             ->json());
+    }
+
+    private function roleFromGroups(array $profile): string
+    {
+        $groups = collect($profile['groups'] ?? $profile['ak_groups'] ?? [])
+            ->map(fn (mixed $group): string => is_array($group) ? (string) ($group['name'] ?? '') : (string) $group)
+            ->filter()
+            ->values();
+
+        if ($groups->contains(config('services.authentik.admin_group'))) {
+            return 'super_admin';
+        }
+
+        if ($groups->contains(config('services.authentik.responsable_group'))) {
+            return 'administrator';
+        }
+
+        if ($groups->contains(config('services.authentik.moderator_group'))) {
+            return 'moderator';
+        }
+
+        return config('services.authentik.default_role');
+    }
+
+    private function idTokenPayload(string $idToken): array
+    {
+        $parts = explode('.', $idToken);
+
+        if (count($parts) < 2) {
+            return [];
+        }
+
+        $payload = json_decode(base64_decode(strtr($parts[1], '-_', '+/')) ?: '', true);
+
+        return is_array($payload) ? $payload : [];
     }
 }

@@ -22,6 +22,26 @@ class DiscordBotResource extends Resource
 
     protected static ?string $navigationLabel = 'Bots Discord';
 
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->canManageConfiguration() ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->canManageConfiguration() ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->canManageConfiguration() ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->canManageConfiguration() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([

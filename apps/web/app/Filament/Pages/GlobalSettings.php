@@ -23,6 +23,11 @@ class GlobalSettings extends Page implements HasForms
 
     public ?array $data = [];
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canManageConfiguration() ?? false;
+    }
+
     public function mount(GlobalSettingsStore $settings): void
     {
         $this->form->fill($settings->all());

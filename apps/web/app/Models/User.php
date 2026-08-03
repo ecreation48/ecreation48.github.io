@@ -44,4 +44,29 @@ class User extends Authenticatable implements FilamentUser
     {
         return in_array($this->role, ['super_admin', 'administrator', 'moderator', 'reviewer', 'viewer'], true);
     }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
+
+    public function canManageReports(): bool
+    {
+        return in_array($this->role, ['super_admin', 'administrator', 'moderator'], true);
+    }
+
+    public function canApplySanctions(): bool
+    {
+        return in_array($this->role, ['super_admin', 'administrator'], true);
+    }
+
+    public function canManageChannels(): bool
+    {
+        return in_array($this->role, ['super_admin', 'administrator'], true);
+    }
+
+    public function canManageConfiguration(): bool
+    {
+        return $this->role === 'super_admin';
+    }
 }

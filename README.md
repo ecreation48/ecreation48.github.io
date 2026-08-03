@@ -43,6 +43,9 @@ AUTHENTIK_ISSUER_URL=https://auth.kinoah2k.com:4443/application/o/SLUG_APPLICATI
 AUTHENTIK_CLIENT_ID=...
 AUTHENTIK_CLIENT_SECRET=...
 AUTHENTIK_TOKEN_AUTH_METHOD=client_secret_post
+AUTHENTIK_ADMIN_GROUP=kino_administrateurs
+AUTHENTIK_RESPONSABLE_GROUP=kino_responsables
+AUTHENTIK_MODERATOR_GROUP=kino_moderateur
 ```
 
 Callback à déclarer dans Authentik : `https://votre-domaine.fr/auth/sso/callback`.

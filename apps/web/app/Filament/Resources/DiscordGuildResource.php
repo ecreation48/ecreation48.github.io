@@ -23,6 +23,26 @@ class DiscordGuildResource extends Resource
     protected static ?string $navigationLabel = 'Serveurs Discord';
     protected static ?string $navigationGroup = 'Discord';
 
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->canManageConfiguration() ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->canManageConfiguration() ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->canManageConfiguration() ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->canManageConfiguration() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([
