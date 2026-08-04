@@ -10,6 +10,7 @@ const voiceDaveEncryptionEnabled = process.env.VOICE_DAVE_ENCRYPTION !== 'false'
 const voiceSelfDeafEnabled = process.env.VOICE_SELF_DEAF === 'true';
 
 export class VoiceAssignmentManager {
+  private readonly connectionGroup: string;
   private assignments = new Map<string, ChannelAssignment>();
   private leaveTimers = new Map<string, NodeJS.Timeout>();
   private sessions = new Map<string, string>();
@@ -24,7 +25,9 @@ export class VoiceAssignmentManager {
     private readonly api: ApiClient,
     private readonly botId: string,
     private readonly audioRecorder: AudioBufferRecorder,
-  ) {}
+  ) {
+    this.connectionGroup = `bot:${botId}`;
+  }
 
   setAssignments(assignments: ChannelAssignment[]): void {
     this.assignments = new Map(assignments.map((assignment) => [assignment.channel_discord_id, assignment]));
@@ -60,7 +63,7 @@ export class VoiceAssignmentManager {
 
     for (const [guildId, assignments] of assignmentsByGuild) {
       await this.enqueueGuild(guildId, async () => {
-        const connection = getVoiceConnection(guildId);
+        const connection = getVoiceConnection(guildId, this.connectionGroup);
         if (connection?.state.status === VoiceConnectionStatus.Disconnected) {
           this.logInfo('voice_guild_reconcile_deferred_during_recovery', {
             guild_id: guildId,
@@ -102,7 +105,7 @@ export class VoiceAssignmentManager {
   private async maybeJoin(state: VoiceState): Promise<void> {
     const channel = state.channel;
     if (!channel || state.member?.user.bot) return;
-    const existingConnection = getVoiceConnection(channel.guild.id);
+    const existingConnection = getVoiceConnection(channel.guild.id, this.connectionGroup);
     if (existingConnection?.state.status === VoiceConnectionStatus.Disconnected) {
       this.logInfo('voice_join_deferred_during_recovery', {
         guild_id: channel.guild.id,
@@ -154,7 +157,7 @@ export class VoiceAssignmentManager {
     const channel = (guild.channels.cache.get(assignment.channel_discord_id) ?? (await guild.channels.fetch(assignment.channel_discord_id))) as VoiceBasedChannel | null;
     if (!channel?.isVoiceBased()) return;
 
-    const connection = getVoiceConnection(guild.id);
+    const connection = getVoiceConnection(guild.id, this.connectionGroup);
     const previousSessionId = this.sessions.get(guild.id);
     let nextConnection = connection;
 
@@ -211,6 +214,7 @@ export class VoiceAssignmentManager {
         channelId: channel.id,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
+        group: this.connectionGroup,
         daveEncryption: voiceDaveEncryptionEnabled,
         debug: voiceDebugEnabled,
         selfDeaf: voiceSelfDeafEnabled,
@@ -423,7 +427,7 @@ export class VoiceAssignmentManager {
     const current = await this.currentChannel(guildId);
     if (current?.id !== channelId || this.hasHumanMembers(current)) return;
 
-    getVoiceConnection(guildId)?.destroy();
+    getVoiceConnection(guildId, this.connectionGroup)?.destroy();
     this.audioRecorder.detach(guildId);
     this.activeChannels.delete(guildId);
     this.leaveTimers.delete(channelId);
@@ -436,7 +440,7 @@ export class VoiceAssignmentManager {
   }
 
   private async currentChannel(guildId: string): Promise<VoiceBasedChannel | null> {
-    const connection = getVoiceConnection(guildId);
+    const connection = getVoiceConnection(guildId, this.connectionGroup);
 
     if (
       connection

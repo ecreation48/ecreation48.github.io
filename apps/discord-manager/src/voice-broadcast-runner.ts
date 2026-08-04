@@ -6,8 +6,11 @@ import type { ApiClient, VoiceBroadcastJob } from './api-client.js';
 
 export class VoiceBroadcastRunner {
   private running = false;
+  private readonly connectionGroup: string;
 
-  constructor(private readonly api: ApiClient, private readonly botId: string) {}
+  constructor(private readonly api: ApiClient, private readonly botId: string) {
+    this.connectionGroup = `bot:${botId}`;
+  }
 
   async runPending(): Promise<void> {
     if (this.running) return;
@@ -29,7 +32,7 @@ export class VoiceBroadcastRunner {
     try {
       if (!job.storage_path) throw new Error('Fichier audio introuvable.');
 
-      const connection = getVoiceConnection(job.guild_discord_id);
+      const connection = getVoiceConnection(job.guild_discord_id, this.connectionGroup);
       if (!connection) throw new Error('Le bot n’est pas connecté à un salon vocal sur ce serveur.');
       if (connection.joinConfig.channelId !== job.channel_discord_id) throw new Error('Le bot est connecté à un autre salon vocal.');
 
