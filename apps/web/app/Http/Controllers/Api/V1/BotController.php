@@ -81,7 +81,7 @@ class BotController extends Controller
             'channels.*.user_limit' => 'nullable|integer|min:0|max:999',
             'roles' => 'array',
             'roles.*.id' => 'required|string|max:255',
-            'roles.*.name' => 'required|string|max:512',
+            'roles.*.name' => 'nullable|string|max:512',
             'roles.*.position' => 'nullable|integer',
         ]);
 
@@ -101,9 +101,11 @@ class BotController extends Controller
         );
 
         foreach ($data['roles'] ?? [] as $role) {
+            $roleName = trim((string) ($role['name'] ?? ''));
+
             DiscordRole::query()->updateOrCreate(
                 ['discord_guild_id' => $guild->id, 'discord_id' => $role['id']],
-                ['name' => $role['name'], 'position' => $role['position'] ?? 0],
+                ['name' => $roleName !== '' ? $roleName : $role['id'], 'position' => $role['position'] ?? 0],
             );
         }
 

@@ -44,7 +44,7 @@ export class DiscordChannelSyncRunner {
           .filter((role) => !role.managed)
           .map((role) => ({
             id: role.id,
-            name: role.name,
+            name: typeof role.name === 'string' && role.name.trim() !== '' ? role.name : role.id,
             position: role.position,
           }));
 
