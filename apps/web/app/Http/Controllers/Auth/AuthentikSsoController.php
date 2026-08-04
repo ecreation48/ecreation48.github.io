@@ -17,6 +17,10 @@ class AuthentikSsoController extends Controller
     {
         $this->ensureConfigured();
 
+        if (Auth::check()) {
+            return redirect('/admin');
+        }
+
         $state = Str::random(48);
         $nonce = Str::random(48);
         $discovery = $this->discovery();
@@ -103,7 +107,7 @@ class AuthentikSsoController extends Controller
         Auth::login($user, true);
         $request->session()->regenerate();
 
-        return redirect()->intended('/admin');
+        return redirect('/admin');
     }
 
     private function ensureConfigured(): void
