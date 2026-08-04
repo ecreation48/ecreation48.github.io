@@ -71,18 +71,18 @@ class BotController extends Controller
         abort_unless($discordBot->is_active, 404);
 
         $data = $request->validate([
-            'guild.name' => 'nullable|string|max:255',
+            'guild.name' => 'nullable|string|max:512',
             'guild.owner_id' => 'nullable|string|max:255',
             'channels' => 'array',
             'channels.*.id' => 'required|string|max:255',
-            'channels.*.name' => 'required|string|max:255',
+            'channels.*.name' => 'required|string|max:512',
             'channels.*.type' => 'required|integer',
             'channels.*.parent_id' => 'nullable|string|max:255',
             'channels.*.user_limit' => 'nullable|integer|min:0|max:999',
             'roles' => 'array',
             'roles.*.id' => 'required|string|max:255',
-            'roles.*.name' => 'required|string|max:255',
-            'roles.*.position' => 'nullable|integer|min:0',
+            'roles.*.name' => 'required|string|max:512',
+            'roles.*.position' => 'nullable|integer',
         ]);
 
         $guildData = $data['guild'] ?? [];

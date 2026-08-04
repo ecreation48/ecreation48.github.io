@@ -21,7 +21,7 @@ export class ApiClient {
     const url=`${this.baseUrl}${path}`;
 
     try {
-      const response=await fetch(url,{...init,headers:{authorization:`Bearer ${this.token}`,'content-type':'application/json',...init.headers},signal:AbortSignal.timeout(this.timeoutMs)});
+      const response=await fetch(url,{...init,headers:{accept:'application/json',authorization:`Bearer ${this.token}`,'content-type':'application/json',...init.headers},redirect:'manual',signal:AbortSignal.timeout(this.timeoutMs)});
       if(!response.ok)throw new Error(`Internal API ${response.status} on ${path}: ${await response.text().catch(()=>'')}`);
       return (await response.json() as ApiEnvelope<T>).data;
     } catch (error) {
