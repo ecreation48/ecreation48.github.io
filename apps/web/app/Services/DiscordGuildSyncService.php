@@ -100,9 +100,13 @@ class DiscordGuildSyncService
             );
         }
 
+        if ($seenIds === []) {
+            return;
+        }
+
         DiscordChannel::query()
             ->where('discord_guild_id', $guild->id)
-            ->when($seenIds !== [], fn ($query) => $query->whereNotIn('discord_id', $seenIds))
+            ->whereNotIn('discord_id', $seenIds)
             ->whereNull('archived_at')
             ->update([
                 'is_monitored' => false,
