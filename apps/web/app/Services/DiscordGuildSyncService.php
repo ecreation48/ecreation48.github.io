@@ -6,6 +6,8 @@ use App\Models\DiscordChannel;
 use App\Models\DiscordGuild;
 use App\Models\DiscordMember;
 use App\Models\DiscordRole;
+use App\Models\BotGuildAssignment;
+use App\Models\DiscordBot;
 use App\Support\GlobalSettings;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
@@ -55,6 +57,7 @@ class DiscordGuildSyncService
         }
 
         $this->syncChannels($guild, collect($client->get("/guilds/{$guild->discord_id}/channels")->throw()->json()));
+        $this->rebalanceMonitoredChannels($guild);
     }
 
     public function syncChannels(DiscordGuild $guild, Collection $channels): void
@@ -106,5 +109,40 @@ class DiscordGuildSyncService
                 'discord_bot_id' => null,
                 'archived_at' => $now,
             ]);
+    }
+
+    public function rebalanceMonitoredChannels(DiscordGuild $guild): void
+    {
+        $botIds = BotGuildAssignment::query()
+            ->where('discord_guild_id', $guild->id)
+            ->where('is_active', true)
+            ->whereHas('bot', fn ($query) => $query->where('is_active', true))
+            ->orderBy('created_at')
+            ->pluck('discord_bot_id')
+            ->values();
+
+        if ($botIds->isEmpty() && filled($guild->discord_bot_id)) {
+            $botIds = DiscordBot::query()
+                ->whereKey($guild->discord_bot_id)
+                ->where('is_active', true)
+                ->pluck('id')
+                ->values();
+        }
+
+        if ($botIds->isEmpty()) {
+            return;
+        }
+
+        DiscordChannel::query()
+            ->where('discord_guild_id', $guild->id)
+            ->voiceBased()
+            ->activeOnDiscord()
+            ->where('is_monitored', true)
+            ->orderBy('name')
+            ->get()
+            ->values()
+            ->each(function (DiscordChannel $channel, int $index) use ($botIds): void {
+                $channel->forceFill(['discord_bot_id' => $botIds[$index % $botIds->count()]])->save();
+            });
     }
 }

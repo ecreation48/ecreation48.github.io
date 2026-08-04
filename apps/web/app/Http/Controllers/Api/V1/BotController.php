@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\BotGuildAssignment;
 use App\Models\DiscordBot;
 use App\Models\DiscordChannel;
 use App\Models\DiscordGuild;
+use App\Models\DiscordRole;
 use App\Models\SystemLog;
 use App\Models\WorkerInstance;
 use App\Services\DiscordGuildSyncService;
@@ -77,6 +79,10 @@ class BotController extends Controller
             'channels.*.type' => 'required|integer',
             'channels.*.parent_id' => 'nullable|string|max:255',
             'channels.*.user_limit' => 'nullable|integer|min:0|max:999',
+            'roles' => 'array',
+            'roles.*.id' => 'required|string|max:255',
+            'roles.*.name' => 'required|string|max:255',
+            'roles.*.position' => 'nullable|integer|min:0',
         ]);
 
         $guildData = $data['guild'] ?? [];
@@ -89,7 +95,20 @@ class BotController extends Controller
             'is_active' => true,
         ])->save();
 
+        BotGuildAssignment::query()->updateOrCreate(
+            ['discord_bot_id' => $discordBot->id, 'discord_guild_id' => $guild->id],
+            ['is_active' => true],
+        );
+
+        foreach ($data['roles'] ?? [] as $role) {
+            DiscordRole::query()->updateOrCreate(
+                ['discord_guild_id' => $guild->id, 'discord_id' => $role['id']],
+                ['name' => $role['name'], 'position' => $role['position'] ?? 0],
+            );
+        }
+
         $sync->syncChannels($guild, collect($data['channels'] ?? []));
+        $sync->rebalanceMonitoredChannels($guild);
 
         return response()->json(['data' => ['accepted' => true]]);
     }

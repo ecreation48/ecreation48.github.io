@@ -28,6 +28,7 @@ export class DiscordChannelSyncRunner {
     try {
       for (const [, guild] of this.client.guilds.cache) {
         await guild.channels.fetch().catch(() => null);
+        await guild.roles.fetch().catch(() => null);
 
         const channels = guild.channels.cache
           .filter((channel): channel is GuildBasedChannel => SYNCABLE_CHANNEL_TYPES.has(channel.type))
@@ -39,9 +40,18 @@ export class DiscordChannelSyncRunner {
             user_limit: 'userLimit' in channel ? channel.userLimit ?? 0 : 0,
           }));
 
+        const roles = guild.roles.cache
+          .filter((role) => !role.managed)
+          .map((role) => ({
+            id: role.id,
+            name: role.name,
+            position: role.position,
+          }));
+
         await this.api.syncGuildChannels(this.botId, guild.id, {
           guild: { name: guild.name, owner_id: guild.ownerId },
           channels,
+          roles,
         }).catch((error: unknown) => {
           console.error(JSON.stringify({
             level: 'error',

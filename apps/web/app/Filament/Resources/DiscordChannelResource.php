@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DiscordChannelResource\Pages;
 use App\Models\DiscordChannel;
+use App\Services\DiscordGuildSyncService;
 use App\Models\VoiceBroadcast;
 use App\Support\GlobalSettings;
 use Filament\Forms;
@@ -135,6 +136,7 @@ class DiscordChannelResource extends Resource
                             'is_monitored' => true,
                             'discord_bot_id' => $record->discord_bot_id ?: $record->guild?->discord_bot_id,
                         ]);
+                        if ($record->guild) app(DiscordGuildSyncService::class)->rebalanceMonitoredChannels($record->guild);
 
                         Notification::make()
                             ->title('Monitoring activé')
@@ -266,6 +268,7 @@ class DiscordChannelResource extends Resource
                                 'discord_bot_id' => $record->discord_bot_id ?: $record->guild?->discord_bot_id,
                             ]);
                         });
+                        $records->pluck('discord_guild_id')->unique()->each(fn (string $guildId) => app(DiscordGuildSyncService::class)->rebalanceMonitoredChannels(\App\Models\DiscordGuild::query()->findOrFail($guildId)));
 
                         Notification::make()
                             ->title('Monitoring activé')
