@@ -71,7 +71,7 @@ class DiscordBotResource extends Resource
     {
         return $table
             ->poll('5s')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('workerInstance'))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['workerInstance', 'activeVoiceSessions.channel', 'activeVoiceSessions.guild']))
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nom')
@@ -89,6 +89,12 @@ class DiscordBotResource extends Resource
                     ->formatStateUsing(fn (string $state): string => self::statusLabel($state))
                     ->badge()
                     ->color(fn (DiscordBot $record, string $state): string => self::statusColor($record, $state)),
+                Tables\Columns\TextColumn::make('current_voice_channels')
+                    ->label('Salons actuels')
+                    ->state(fn (DiscordBot $record): string => self::currentVoiceChannels($record))
+                    ->description(fn (DiscordBot $record): ?string => self::currentVoiceChannelsActivity($record))
+                    ->placeholder('Aucun salon')
+                    ->wrap(),
                 Tables\Columns\TextColumn::make('workerInstance.name')
                     ->label('Worker')
                     ->placeholder('Aucun worker')
@@ -420,6 +426,36 @@ class DiscordBotResource extends Resource
         }
 
         return 'En attente de démarrage';
+    }
+
+    private static function currentVoiceChannels(DiscordBot $bot): string
+    {
+        $sessions = $bot->activeVoiceSessions;
+
+        if ($sessions->isEmpty()) {
+            return 'Aucun salon';
+        }
+
+        return $sessions
+            ->map(function ($session): string {
+                $guild = $session->guild?->name ?? 'Serveur inconnu';
+                $channel = $session->channel?->name ?? 'Salon inconnu';
+                $members = (int) $session->member_count;
+
+                return "{$guild} - {$channel} ({$members})";
+            })
+            ->join("\n");
+    }
+
+    private static function currentVoiceChannelsActivity(DiscordBot $bot): ?string
+    {
+        $lastActivity = $bot->activeVoiceSessions
+            ->pluck('last_activity_at')
+            ->filter()
+            ->sortDesc()
+            ->first();
+
+        return $lastActivity ? 'Activité '.$lastActivity->diffForHumans() : null;
     }
 
     private static function isStaleConnecting(DiscordBot $bot): bool

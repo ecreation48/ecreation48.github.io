@@ -15,5 +15,6 @@ class DiscordBot extends Model {
  public function guildAssignments(): HasMany { return $this->hasMany(BotGuildAssignment::class); }
  public function channelAssignments(): HasMany { return $this->hasMany(VoiceChannelAssignment::class); }
  public function voiceSessions(): HasMany { return $this->hasMany(VoiceSession::class); }
+ public function activeVoiceSessions(): HasMany { return $this->hasMany(VoiceSession::class)->whereNull('ended_at')->where('last_activity_at','>=',now()->subMinutes(2))->latest('last_activity_at')->latest('started_at'); }
  public function workerInstance(): BelongsTo { return $this->belongsTo(WorkerInstance::class); }
 }
