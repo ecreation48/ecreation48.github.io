@@ -84,6 +84,7 @@ ensure_env_value /etc/voice-guardian/worker.env VOICE_CHANNEL_LOCK_TTL_MS 45000
 ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_DETECTION true
 ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_INTERVAL_MS 30000
 ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_MAX_TRANSCRIPTIONS_PER_CYCLE 2
+ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_GLOBAL_TRANSCRIPTION_LIMIT 1
 ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_COOLDOWN_SECONDS 300
 
 ensure_whisper_installation

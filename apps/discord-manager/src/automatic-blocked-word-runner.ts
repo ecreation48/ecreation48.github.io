@@ -25,7 +25,10 @@ const ENABLED = process.env.AUTO_BLOCKED_WORD_DETECTION !== 'false';
 const INTERVAL_MS = Number(process.env.AUTO_BLOCKED_WORD_INTERVAL_MS ?? 30_000);
 const MAX_TRANSCRIPTIONS_PER_CYCLE = Number(process.env.AUTO_BLOCKED_WORD_MAX_TRANSCRIPTIONS_PER_CYCLE ?? 2);
 const COOLDOWN_SECONDS = Number(process.env.AUTO_BLOCKED_WORD_COOLDOWN_SECONDS ?? 300);
+const GLOBAL_TRANSCRIPTION_LIMIT = Number(process.env.AUTO_BLOCKED_WORD_GLOBAL_TRANSCRIPTION_LIMIT ?? 1);
+const TRANSCRIPTION_SLOT_TTL_MS = Number(process.env.TRANSCRIPTION_TIMEOUT_MS ?? 120_000) + 30_000;
 const REPORTER_ID = 'automatic:blocked-word-detection';
+const RELEASE_TRANSCRIPTION_SLOT_SCRIPT = "if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end";
 
 export class AutomaticBlockedWordRunner {
   private running = false;
@@ -132,7 +135,20 @@ export class AutomaticBlockedWordRunner {
     if (!snapshot) return { snapshot: false, transcribed: false, matched: false, reported: false, skipped_reason: 'snapshot_unavailable' };
     if (snapshot.durationSeconds < 2) return { snapshot: true, transcribed: false, matched: false, reported: false, skipped_reason: 'snapshot_too_short' };
 
-    const transcript = await this.transcriber.transcribe(`auto-${reportKey}`, `auto-${reportKey}`, userId, snapshot.path);
+    const slot = await this.acquireTranscriptionSlot(reportKey);
+    if (!slot) {
+      this.logInfo('auto_blocked_word_transcription_deferred', {
+        guild_id: target.guild_discord_id,
+        channel_id: target.channel_discord_id,
+        user_id: userId,
+        global_limit: GLOBAL_TRANSCRIPTION_LIMIT,
+      });
+
+      return { snapshot: true, transcribed: false, matched: false, reported: false, skipped_reason: 'transcription_busy' };
+    }
+
+    const transcript = await this.transcriber.transcribe(`auto-${reportKey}`, `auto-${reportKey}`, userId, snapshot.path)
+      .finally(() => this.releaseTranscriptionSlot(slot).catch(() => undefined));
     if (transcript.status !== 'completed') {
       this.logInfo('auto_blocked_word_transcription_not_completed', {
         guild_id: target.guild_discord_id,
@@ -243,6 +259,23 @@ export class AutomaticBlockedWordRunner {
   private async claimCooldown(target: Target, userId: string, normalizedWord: string): Promise<boolean> {
     const key = `auto-blocked-word:${target.guild_discord_id}:${target.channel_discord_id}:${userId}:${normalizedWord}`;
     return (await this.redis.set(key, '1', 'EX', COOLDOWN_SECONDS, 'NX').catch(() => null)) === 'OK';
+  }
+
+  private async acquireTranscriptionSlot(reportKey: string): Promise<{ key: string; value: string } | null> {
+    const limit = Math.max(1, GLOBAL_TRANSCRIPTION_LIMIT);
+    const value = `${this.botId}:${reportKey}:${Date.now()}`;
+
+    for (let index = 0; index < limit; index++) {
+      const key = `auto-blocked-word-transcription-slot:${index}`;
+      const acquired = await this.redis.set(key, value, 'PX', TRANSCRIPTION_SLOT_TTL_MS, 'NX').catch(() => null);
+      if (acquired === 'OK') return { key, value };
+    }
+
+    return null;
+  }
+
+  private async releaseTranscriptionSlot(slot: { key: string; value: string }): Promise<void> {
+    await this.redis.eval(RELEASE_TRANSCRIPTION_SLOT_SCRIPT, 1, slot.key, slot.value);
   }
 
   private async refreshForbiddenWords(): Promise<void> {
