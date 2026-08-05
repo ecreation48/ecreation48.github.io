@@ -4,7 +4,6 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DiscordChannelResource\Pages;
 use App\Models\DiscordChannel;
-use App\Services\DiscordGuildSyncService;
 use App\Models\VoiceBroadcast;
 use App\Support\GlobalSettings;
 use Filament\Forms;
@@ -81,12 +80,6 @@ class DiscordChannelResource extends Resource
                         ->label('Surveiller ce salon')
                         ->default(fn (): bool => (bool) app(GlobalSettings::class)->get('defaults.monitor_new_voice_channels', true))
                         ->live(),
-                    Forms\Components\Select::make('discord_bot_id')
-                        ->label('Bot affecté')
-                        ->relationship('bot', 'name')
-                        ->searchable()
-                        ->preload()
-                        ->helperText('Un bot peut surveiller plusieurs salons configurés, mais il ne rejoint qu’un salon actif à la fois et bascule quand le salon courant est vide.'),
                     Forms\Components\TextInput::make('buffer_seconds')
                         ->numeric()
                         ->minValue(15)
@@ -119,7 +112,6 @@ class DiscordChannelResource extends Resource
                 Tables\Columns\IconColumn::make('transcription_enabled')
                     ->label('Transcription')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('bot.name')->label('Bot'),
                 Tables\Columns\TextColumn::make('buffer_seconds')->suffix(' s'),
             ])
             ->filters([
@@ -134,9 +126,8 @@ class DiscordChannelResource extends Resource
                     ->action(function (DiscordChannel $record): void {
                         $record->update([
                             'is_monitored' => true,
-                            'discord_bot_id' => $record->discord_bot_id ?: $record->guild?->discord_bot_id,
+                            'discord_bot_id' => null,
                         ]);
-                        if ($record->guild) app(DiscordGuildSyncService::class)->rebalanceMonitoredChannels($record->guild);
 
                         Notification::make()
                             ->title('Monitoring activé')
@@ -179,7 +170,7 @@ class DiscordChannelResource extends Resource
                     ->label('Faire parler')
                     ->icon('heroicon-o-megaphone')
                     ->color('warning')
-                    ->visible(fn (DiscordChannel $record): bool => $record->is_monitored && filled($record->discord_bot_id))
+                    ->visible(fn (DiscordChannel $record): bool => false)
                     ->form([
                         Forms\Components\TextInput::make('title')
                             ->label('Nom du message')
@@ -204,7 +195,7 @@ class DiscordChannelResource extends Resource
                         $mimeType = self::mimeTypeForAudioExtension($extension);
 
                         VoiceBroadcast::query()->create([
-                            'discord_bot_id' => $record->discord_bot_id,
+                            'discord_bot_id' => $record->guild?->discord_bot_id,
                             'discord_guild_id' => $record->discord_guild_id,
                             'discord_channel_id' => $record->id,
                             'type' => 'file',
@@ -265,10 +256,9 @@ class DiscordChannelResource extends Resource
                         $records->each(function (DiscordChannel $record): void {
                             $record->update([
                                 'is_monitored' => true,
-                                'discord_bot_id' => $record->discord_bot_id ?: $record->guild?->discord_bot_id,
+                                'discord_bot_id' => null,
                             ]);
                         });
-                        $records->pluck('discord_guild_id')->unique()->each(fn (string $guildId) => app(DiscordGuildSyncService::class)->rebalanceMonitoredChannels(\App\Models\DiscordGuild::query()->findOrFail($guildId)));
 
                         Notification::make()
                             ->title('Monitoring activé')

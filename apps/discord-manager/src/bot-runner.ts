@@ -47,7 +47,7 @@ export class BotRunner {
         intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
       });
 
-      this.voiceManager = new VoiceAssignmentManager(this.client, this.api, this.bot.id, this.audioRecorder);
+      this.voiceManager = new VoiceAssignmentManager(this.client, this.api, this.bot.id, this.lock.redis, this.audioRecorder);
       this.commandHandler = new CommandHandler(this.client, this.api, this.bot.id, credentials.client_id, credentials.token, this.audioRecorder);
       this.moderationRunner = new ModerationActionRunner(this.client, this.api, this.bot.id);
       this.broadcastRunner = new VoiceBroadcastRunner(this.api, this.bot.id);
@@ -57,6 +57,7 @@ export class BotRunner {
       this.client.once(Events.ClientReady, () => void this.onReady().catch((error) => this.logError('ready_failed', error)));
       this.client.on(Events.InteractionCreate, (interaction) => void this.commandHandler?.handle(interaction));
       this.client.on(Events.VoiceStateUpdate, (oldState, newState) => this.voiceManager?.handleVoiceState(oldState, newState));
+      this.client.on(Events.ChannelCreate, () => void this.channelSyncRunner?.runDue(true));
       this.client.on(Events.Error, (error) => void this.safeHeartbeat('error', error.message));
 
       await this.client.login(credentials.token);
@@ -145,6 +146,7 @@ export class BotRunner {
   async stop(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    await this.voiceManager?.stop();
     this.client?.destroy();
     this.client = null;
     await this.safeHeartbeat('offline');

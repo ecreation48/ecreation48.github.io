@@ -11,6 +11,16 @@ fi
 
 cd "$APP_DIR"
 
+ensure_env_value() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+
+  if [[ -f "$file" ]] && ! grep -q "^${key}=" "$file"; then
+    echo "${key}=${value}" >> "$file"
+  fi
+}
+
 if [[ -d .git ]]; then
   git config --global --add safe.directory "$APP_DIR" || true
   git pull --ff-only
@@ -19,6 +29,11 @@ fi
 install -d -o "$APP_USER" -g www-data apps/web/storage apps/web/bootstrap/cache apps/discord-manager/storage/audio-clips
 chown -R "$APP_USER":www-data apps/web/storage apps/web/bootstrap/cache apps/discord-manager/storage
 chmod -R ug+rwX apps/web/storage apps/web/bootstrap/cache apps/discord-manager/storage
+
+ensure_env_value /etc/voice-guardian/worker.env DISCORD_CHANNEL_SYNC_INTERVAL_MS 120000
+ensure_env_value /etc/voice-guardian/worker.env VOICE_MIN_HUMAN_MEMBERS 2
+ensure_env_value /etc/voice-guardian/worker.env VOICE_INSUFFICIENT_MEMBERS_GRACE_MS 2000
+ensure_env_value /etc/voice-guardian/worker.env VOICE_CHANNEL_LOCK_TTL_MS 45000
 
 sudo -u "$APP_USER" composer install --working-dir=apps/web --no-dev --prefer-dist --no-interaction --optimize-autoloader
 sudo -u "$APP_USER" npm ci

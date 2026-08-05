@@ -11,7 +11,7 @@ const SYNCABLE_CHANNEL_TYPES = new Set<number>([
 export class DiscordChannelSyncRunner {
   private lastSyncAt = 0;
   private running = false;
-  private readonly intervalMs = Number(process.env.DISCORD_CHANNEL_SYNC_INTERVAL_MS ?? 600_000);
+  private readonly intervalMs = Number(process.env.DISCORD_CHANNEL_SYNC_INTERVAL_MS ?? 120_000);
 
   constructor(
     private readonly client: Client,

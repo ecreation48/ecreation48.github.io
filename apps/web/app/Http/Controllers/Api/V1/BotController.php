@@ -41,7 +41,11 @@ class BotController extends Controller
         abort_unless($discordBot->is_active, 404);
 
         $channels = DiscordChannel::query()
-            ->where('discord_bot_id', $discordBot->id)
+            ->whereHas('guild', fn ($query) => $query
+                ->where('discord_bot_id', $discordBot->id)
+                ->orWhereHas('botAssignments', fn ($assignmentQuery) => $assignmentQuery
+                    ->where('discord_bot_id', $discordBot->id)
+                    ->where('is_active', true)))
             ->where('is_monitored', true)
             ->activeOnDiscord()
             ->voiceBased()
@@ -110,7 +114,6 @@ class BotController extends Controller
         }
 
         $sync->syncChannels($guild, collect($data['channels'] ?? []));
-        $sync->rebalanceMonitoredChannels($guild);
 
         return response()->json(['data' => ['accepted' => true]]);
     }

@@ -1,16 +1,22 @@
 import { entersState, getVoiceConnection, joinVoiceChannel, VoiceConnectionDisconnectReason, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
 import type { Client, GuildMember, VoiceBasedChannel, VoiceState } from 'discord.js';
+import type { Redis } from 'ioredis';
 import type { AudioBufferRecorder } from './audio-buffer-recorder.js';
 import type { ApiClient, ChannelAssignment } from './api-client.js';
 
-const EMPTY_CHANNEL_GRACE_MS = 30_000;
+const INSUFFICIENT_MEMBERS_GRACE_MS = Number(process.env.VOICE_INSUFFICIENT_MEMBERS_GRACE_MS ?? 2_000);
+const MIN_HUMAN_MEMBERS = Number(process.env.VOICE_MIN_HUMAN_MEMBERS ?? 2);
+const CHANNEL_LOCK_TTL_MS = Number(process.env.VOICE_CHANNEL_LOCK_TTL_MS ?? 45_000);
 const DISCONNECTED_RECOVERY_GRACE_MS = Number(process.env.VOICE_DISCONNECTED_RECOVERY_GRACE_MS ?? 5_000);
 const voiceDebugEnabled = process.env.VOICE_DEBUG === 'true';
 const voiceDaveEncryptionEnabled = process.env.VOICE_DAVE_ENCRYPTION !== 'false';
 const voiceSelfDeafEnabled = process.env.VOICE_SELF_DEAF === 'true';
+const RENEW_CHANNEL_LOCK_SCRIPT = "if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('pexpire',KEYS[1],ARGV[2]) else return 0 end";
+const RELEASE_CHANNEL_LOCK_SCRIPT = "if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end";
 
 export class VoiceAssignmentManager {
   private readonly connectionGroup: string;
+  private readonly lockOwner: string;
   private assignments = new Map<string, ChannelAssignment>();
   private leaveTimers = new Map<string, NodeJS.Timeout>();
   private sessions = new Map<string, string>();
@@ -24,9 +30,11 @@ export class VoiceAssignmentManager {
     private readonly client: Client,
     private readonly api: ApiClient,
     private readonly botId: string,
+    private readonly redis: Redis,
     private readonly audioRecorder: AudioBufferRecorder,
   ) {
     this.connectionGroup = `bot:${botId}`;
+    this.lockOwner = `bot:${botId}`;
   }
 
   setAssignments(assignments: ChannelAssignment[]): void {
@@ -80,7 +88,12 @@ export class VoiceAssignmentManager {
           current_human_member_count: current ? this.humanMembers(current).length : 0,
         });
 
-        if (current && this.hasHumanMembers(current)) {
+        if (current && this.hasEnoughHumanMembers(current)) {
+          if (!await this.acquireChannelLock(guildId, current.id)) {
+            await this.leave(guildId, current.id, true);
+            return;
+          }
+
           await this.heartbeatCurrent(guildId, current).catch((error) => this.logError('voice_session_heartbeat_failed', error));
           return;
         }
@@ -121,20 +134,31 @@ export class VoiceAssignmentManager {
     const current = await this.currentChannel(channel.guild.id);
 
     if (current?.id === channel.id) {
-      await this.heartbeatCurrent(channel.guild.id, channel).catch((error) => this.logError('voice_session_heartbeat_failed', error));
+      if (this.hasEnoughHumanMembers(channel)) {
+        if (!await this.acquireChannelLock(channel.guild.id, channel.id)) {
+          await this.leave(channel.guild.id, channel.id, true);
+          return;
+        }
+
+        await this.heartbeatCurrent(channel.guild.id, channel).catch((error) => this.logError('voice_session_heartbeat_failed', error));
+      } else {
+        await this.scheduleLeave(channel);
+      }
       return;
     }
 
-    if (current && this.hasHumanMembers(current)) {
+    if (current && this.hasEnoughHumanMembers(current)) {
       return;
     }
+
+    if (!this.hasEnoughHumanMembers(channel)) return;
 
     await this.switchTo(assignment);
   }
 
   private async maybeScheduleLeave(state: VoiceState): Promise<void> {
     const channel = state.channel;
-    if (!channel || !this.assignments.has(channel.id) || this.hasHumanMembers(channel)) return;
+    if (!channel || !this.assignments.has(channel.id) || this.hasEnoughHumanMembers(channel)) return;
 
     const currentChannelId = this.activeChannels.get(channel.guild.id);
     if (currentChannelId !== channel.id || this.leaveTimers.has(channel.id)) return;
@@ -196,6 +220,9 @@ export class VoiceAssignmentManager {
         }
       } else {
         this.audioRecorder.detach(guild.id);
+        if (connection.joinConfig.channelId) {
+          await this.releaseChannelLock(guild.id, connection.joinConfig.channelId);
+        }
         connection.destroy();
         nextConnection = undefined;
       }
@@ -207,6 +234,20 @@ export class VoiceAssignmentManager {
     }
 
     const members = this.humanMembers(channel);
+    if (members.length < MIN_HUMAN_MEMBERS) {
+      await this.scheduleLeave(channel);
+      return;
+    }
+
+    if (!await this.acquireChannelLock(guild.id, channel.id)) {
+      this.logInfo('voice_channel_lock_busy', {
+        guild_id: guild.id,
+        channel_id: channel.id,
+        channel_name: channel.name,
+      });
+      return;
+    }
+
     const joinAttempt = this.nextJoinAttempt(guild.id);
 
     if (!nextConnection) {
@@ -239,6 +280,7 @@ export class VoiceAssignmentManager {
       this.audioRecorder.detach(guild.id);
       this.activeChannels.delete(guild.id);
       this.sessions.delete(guild.id);
+      await this.releaseChannelLock(guild.id, channel.id);
 
       if (nextConnection.state.status !== VoiceConnectionStatus.Destroyed) {
         nextConnection.destroy();
@@ -269,6 +311,7 @@ export class VoiceAssignmentManager {
     this.sessions.set(guild.id, session.id);
     this.activeChannels.set(guild.id, channel.id);
     this.clearLeaveTimer(channel.id);
+    await this.renewChannelLock(guild.id, channel.id);
     this.audioRecorder.attach(nextConnection, channel.id, session.id, assignment.buffer_seconds, members.map((member) => member.discord_user_id));
   }
 
@@ -401,6 +444,7 @@ export class VoiceAssignmentManager {
     this.activeChannels.delete(guildId);
     this.leaveTimers.delete(channelId);
     this.recoveringGuilds.delete(guildId);
+    await this.releaseChannelLock(guildId, channelId);
 
     const sessionId = this.sessions.get(guildId);
     if (sessionId) {
@@ -419,18 +463,21 @@ export class VoiceAssignmentManager {
       channel.id,
       setTimeout(() => {
         void this.leave(channel.guild.id, channel.id);
-      }, EMPTY_CHANNEL_GRACE_MS),
+      }, INSUFFICIENT_MEMBERS_GRACE_MS),
     );
   }
 
-  private async leave(guildId: string, channelId: string): Promise<void> {
+  private async leave(guildId: string, channelId: string): Promise<void>;
+  private async leave(guildId: string, channelId: string, force: true): Promise<void>;
+  private async leave(guildId: string, channelId: string, force = false): Promise<void> {
     const current = await this.currentChannel(guildId);
-    if (current?.id !== channelId || this.hasHumanMembers(current)) return;
+    if (!force && (current?.id !== channelId || this.hasEnoughHumanMembers(current))) return;
 
     getVoiceConnection(guildId, this.connectionGroup)?.destroy();
     this.audioRecorder.detach(guildId);
     this.activeChannels.delete(guildId);
     this.leaveTimers.delete(channelId);
+    await this.releaseChannelLock(guildId, channelId);
 
     const sessionId = this.sessions.get(guildId);
     if (sessionId) {
@@ -466,6 +513,21 @@ export class VoiceAssignmentManager {
     await this.api.voiceSessionHeartbeat(sessionId, { member_count: members.length, status: 'active', members });
   }
 
+  async stop(): Promise<void> {
+    for (const timer of this.leaveTimers.values()) clearTimeout(timer);
+    this.leaveTimers.clear();
+
+    for (const [guildId, channelId] of this.activeChannels) {
+      getVoiceConnection(guildId, this.connectionGroup)?.destroy();
+      this.audioRecorder.detach(guildId);
+      await this.releaseChannelLock(guildId, channelId);
+    }
+
+    this.activeChannels.clear();
+    this.sessions.clear();
+    this.recoveringGuilds.clear();
+  }
+
   private logError(event: string, error: unknown): void {
     console.error(JSON.stringify({ level: 'error', event, message: error instanceof Error ? error.message : 'unknown' }));
   }
@@ -491,7 +553,7 @@ export class VoiceAssignmentManager {
         human_member_count: members.length,
       });
 
-      if (members.length > 0) return assignment;
+      if (members.length >= MIN_HUMAN_MEMBERS && await this.isChannelAvailable(assignment.guild_discord_id, assignment.channel_discord_id)) return assignment;
     }
 
     return null;
@@ -517,7 +579,7 @@ export class VoiceAssignmentManager {
         human_member_count: members.length,
       });
 
-      if (members.length > 0) return previous;
+      if (members.length >= MIN_HUMAN_MEMBERS) return previous;
     }
 
     return this.firstActiveAssignment(assignments);
@@ -617,8 +679,8 @@ export class VoiceAssignmentManager {
     return this.joinAttempts.get(guildId) === attempt;
   }
 
-  private hasHumanMembers(channel: VoiceBasedChannel): boolean {
-    return this.humanMembers(channel).length > 0;
+  private hasEnoughHumanMembers(channel: VoiceBasedChannel): boolean {
+    return this.humanMembers(channel).length >= MIN_HUMAN_MEMBERS;
   }
 
   private humanMembers(channel: VoiceBasedChannel): { discord_user_id: string; display_name: string }[] {
@@ -632,6 +694,40 @@ export class VoiceAssignmentManager {
       : channel.members.filter((member) => !member.user.bot).map((member) => member);
 
     return members.map((member) => ({ discord_user_id: member.id, display_name: member.displayName }));
+  }
+
+  private channelLockKey(guildId: string, channelId: string): string {
+    return `voice-channel-lock:${guildId}:${channelId}`;
+  }
+
+  private async acquireChannelLock(guildId: string, channelId: string): Promise<boolean> {
+    const key = this.channelLockKey(guildId, channelId);
+    const current = await this.redis.get(key).catch(() => null);
+    if (current === this.lockOwner) {
+      await this.renewChannelLock(guildId, channelId);
+      return true;
+    }
+
+    return (await this.redis.set(key, this.lockOwner, 'PX', CHANNEL_LOCK_TTL_MS, 'NX').catch(() => null)) === 'OK';
+  }
+
+  private async renewChannelLock(guildId: string, channelId: string): Promise<boolean> {
+    const renewed = await this.redis
+      .eval(RENEW_CHANNEL_LOCK_SCRIPT, 1, this.channelLockKey(guildId, channelId), this.lockOwner, String(CHANNEL_LOCK_TTL_MS))
+      .catch(() => 0);
+
+    return Number(renewed) === 1;
+  }
+
+  private async releaseChannelLock(guildId: string, channelId: string): Promise<void> {
+    await this.redis
+      .eval(RELEASE_CHANNEL_LOCK_SCRIPT, 1, this.channelLockKey(guildId, channelId), this.lockOwner)
+      .catch(() => undefined);
+  }
+
+  private async isChannelAvailable(guildId: string, channelId: string): Promise<boolean> {
+    const owner = await this.redis.get(this.channelLockKey(guildId, channelId)).catch(() => null);
+    return owner === null || owner === this.lockOwner;
   }
 
   private logInfo(event: string, context: Record<string, unknown> = {}): void {
