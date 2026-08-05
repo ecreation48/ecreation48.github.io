@@ -21,6 +21,53 @@ ensure_env_value() {
   fi
 }
 
+env_value() {
+  local file="$1"
+  local key="$2"
+
+  if [[ ! -f "$file" ]]; then
+    return 0
+  fi
+
+  grep -E "^${key}=" "$file" | tail -n 1 | cut -d= -f2- | sed "s/^['\"]//; s/['\"]$//"
+}
+
+ensure_whisper_installation() {
+  local worker_env="/etc/voice-guardian/worker.env"
+  local provider
+  local binary
+  local model
+  local model_name
+  local whisper_dir
+
+  provider="$(env_value "$worker_env" TRANSCRIPTION_PROVIDER)"
+  if [[ "$provider" != "command" ]]; then
+    return 0
+  fi
+
+  binary="$(env_value "$worker_env" WHISPER_CPP_BINARY)"
+  model="$(env_value "$worker_env" WHISPER_CPP_MODEL)"
+
+  if [[ -z "$binary" || -z "$model" ]]; then
+    echo "Whisper local est activé, mais WHISPER_CPP_BINARY ou WHISPER_CPP_MODEL manque dans $worker_env."
+    return 0
+  fi
+
+  if [[ -x "$binary" && -f "$model" ]]; then
+    return 0
+  fi
+
+  model_name="$(basename "$model")"
+  model_name="${model_name#ggml-}"
+  model_name="${model_name%.bin}"
+  whisper_dir="$(dirname "$(dirname "$model")")"
+
+  echo "Installation Whisper requise : binaire ou modèle introuvable."
+  echo "Binaire attendu : $binary"
+  echo "Modèle attendu : $model"
+  WHISPER_DIR="$whisper_dir" MODEL="$model_name" bash "$APP_DIR/scripts/linux/install-whisper.sh"
+}
+
 if [[ -d .git ]]; then
   git config --global --add safe.directory "$APP_DIR" || true
   git pull --ff-only
@@ -38,6 +85,8 @@ ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_DETECTION true
 ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_INTERVAL_MS 30000
 ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_MAX_TRANSCRIPTIONS_PER_CYCLE 2
 ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_COOLDOWN_SECONDS 300
+
+ensure_whisper_installation
 
 sudo -u "$APP_USER" composer install --working-dir=apps/web --no-dev --prefer-dist --no-interaction --optimize-autoloader
 sudo -u "$APP_USER" npm ci
