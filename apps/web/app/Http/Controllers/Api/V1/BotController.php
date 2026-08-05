@@ -64,6 +64,7 @@ class BotController extends Controller
                     'retention_days' => $channel->retention_days,
                     'report_notification_channel_discord_id' => $guild?->report_notification_channel_discord_id,
                     'report_mention_role_discord_ids' => $guild?->report_mention_role_discord_ids ?? [],
+                    'moderator_role_discord_id' => $guild?->moderator_role_discord_id,
                     'auto_detection_enabled' => (bool) ($channel->moderation_config['auto_detection_enabled'] ?? true),
                     'auto_detection_priority' => (int) ($channel->moderation_config['auto_detection_priority'] ?? 0),
                 ];
