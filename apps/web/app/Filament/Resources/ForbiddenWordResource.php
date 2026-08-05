@@ -6,6 +6,7 @@ use App\Filament\Resources\ForbiddenWordResource\Pages;
 use App\Models\ForbiddenWord;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -23,22 +24,27 @@ class ForbiddenWordResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->canApplySanctions() ?? false;
+        return auth()->user()?->canManageForbiddenWords() ?? false;
     }
 
     public static function canCreate(): bool
     {
-        return auth()->user()?->canApplySanctions() ?? false;
+        return auth()->user()?->canManageForbiddenWords() ?? false;
     }
 
     public static function canEdit($record): bool
     {
-        return auth()->user()?->canApplySanctions() ?? false;
+        return auth()->user()?->canManageForbiddenWords() ?? false;
     }
 
     public static function canDelete($record): bool
     {
-        return auth()->user()?->isSuperAdmin() ?? false;
+        return auth()->user()?->canManageForbiddenWords() ?? false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()?->canManageForbiddenWords() ?? false;
     }
 
     public static function form(Form $form): Form
@@ -107,7 +113,36 @@ class ForbiddenWordResource extends Resource
                 Tables\Actions\DeleteAction::make()->label('Supprimer'),
             ])
             ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make()->label('Supprimer la sélection'),
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('activateSelected')
+                        ->label('Activer la sélection')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->action(function ($records): void {
+                            $count = $records->count();
+                            $records->each->update(['is_active' => true]);
+
+                            Notification::make()
+                                ->title($count.' mot(s) interdit(s) activé(s)')
+                                ->success()
+                                ->send();
+                        }),
+                    Tables\Actions\BulkAction::make('deactivateSelected')
+                        ->label('Désactiver la sélection')
+                        ->icon('heroicon-o-no-symbol')
+                        ->color('gray')
+                        ->requiresConfirmation()
+                        ->action(function ($records): void {
+                            $count = $records->count();
+                            $records->each->update(['is_active' => false]);
+
+                            Notification::make()
+                                ->title($count.' mot(s) interdit(s) désactivé(s)')
+                                ->success()
+                                ->send();
+                        }),
+                    Tables\Actions\DeleteBulkAction::make()->label('Supprimer la sélection'),
+                ]),
             ]);
     }
 

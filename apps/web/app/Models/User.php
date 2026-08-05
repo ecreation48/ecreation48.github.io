@@ -60,6 +60,11 @@ class User extends Authenticatable implements FilamentUser
         return in_array($this->role, ['super_admin', 'administrator'], true);
     }
 
+    public function canManageForbiddenWords(): bool
+    {
+        return in_array($this->role, ['super_admin', 'administrator'], true);
+    }
+
     public function canManageChannels(): bool
     {
         return in_array($this->role, ['super_admin', 'administrator'], true);
