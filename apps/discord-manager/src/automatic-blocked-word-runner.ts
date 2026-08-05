@@ -1,6 +1,8 @@
+import type { Client } from 'discord.js';
 import type { Redis } from 'ioredis';
 import type { AudioBufferRecorder } from './audio-buffer-recorder.js';
 import type { ApiClient, ChannelAssignment, ForbiddenWord, TranscriptPayload, TranscriptSegmentPayload } from './api-client.js';
+import { ReportNotifier } from './report-notifier.js';
 import { TranscriptionRunner } from './transcription-runner.js';
 
 interface Target extends ChannelAssignment {
@@ -36,13 +38,17 @@ export class AutomaticBlockedWordRunner {
   private forbiddenWords: ForbiddenWord[] = [];
   private forbiddenWordsLoadedAt = 0;
   private readonly transcriber = new TranscriptionRunner();
+  private readonly notifier: ReportNotifier;
 
   constructor(
+    client: Client,
     private readonly api: ApiClient,
     private readonly redis: Redis,
     private readonly audioRecorder: AudioBufferRecorder,
     private readonly botId: string,
-  ) {}
+  ) {
+    this.notifier = new ReportNotifier(client);
+  }
 
   async runDue(targets: Target[]): Promise<void> {
     if (!ENABLED || this.running || Date.now() - this.lastRunAt < INTERVAL_MS) return;
@@ -211,6 +217,18 @@ export class AutomaticBlockedWordRunner {
       voice_report_id: report.id,
       voice_audio_clip_id: clip.id,
       reported_user_discord_id: userId,
+    });
+
+    await this.notifier.notify({
+      assignment: target,
+      reportId: report.id,
+      targetUserId: userId,
+      reporterUserId: null,
+      reason: 'Détection de mots bloqués',
+      clipCount: 1,
+      source: 'blocked_word',
+      matchedWord: match.word.word,
+      confidence,
     });
 
     console.log(JSON.stringify({

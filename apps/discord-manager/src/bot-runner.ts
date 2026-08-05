@@ -54,7 +54,7 @@ export class BotRunner {
       this.moderationRunner = new ModerationActionRunner(this.client, this.api, this.bot.id);
       this.broadcastRunner = new VoiceBroadcastRunner(this.api, this.bot.id);
       this.transcriptionRunner = new TranscriptionJobRunner(this.api);
-      this.automaticBlockedWordRunner = new AutomaticBlockedWordRunner(this.api, this.lock.redis, this.audioRecorder, this.bot.id);
+      this.automaticBlockedWordRunner = new AutomaticBlockedWordRunner(this.client, this.api, this.lock.redis, this.audioRecorder, this.bot.id);
       this.channelSyncRunner = new DiscordChannelSyncRunner(this.client, this.api, this.bot.id);
 
       this.client.once(Events.ClientReady, () => void this.onReady().catch((error) => this.logError('ready_failed', error)));

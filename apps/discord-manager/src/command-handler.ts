@@ -20,6 +20,7 @@ import type {
 } from 'discord.js';
 import type { AudioBufferRecorder } from './audio-buffer-recorder.js';
 import type { ApiClient, ChannelAssignment } from './api-client.js';
+import { ReportNotifier } from './report-notifier.js';
 
 const REPORT_BUTTON_ID = 'voice-guardian:report';
 const REPORT_MODAL_ID = 'voice-guardian:report-modal';
@@ -61,6 +62,7 @@ const COMMANDS = [
 
 export class CommandHandler {
   private assignments: ChannelAssignment[] = [];
+  private readonly notifier: ReportNotifier;
 
   constructor(
     private readonly client: Client,
@@ -69,7 +71,9 @@ export class CommandHandler {
     private readonly clientId: string,
     private readonly token: string,
     private readonly audioRecorder: AudioBufferRecorder,
-  ) {}
+  ) {
+    this.notifier = new ReportNotifier(client);
+  }
 
   setAssignments(assignments: ChannelAssignment[]): void {
     this.assignments = assignments;
@@ -315,46 +319,14 @@ export class CommandHandler {
           : `Signalement créé sans extrait audio disponible. Référence : ${report.id}`,
     });
 
-    await this.notifyReportCreated(interaction, assignment, report.id, targetUserId, reason, clipCount);
-  }
-
-  private async notifyReportCreated(
-    interaction: ChatInputCommandInteraction | ModalSubmitInteraction,
-    assignment: ChannelAssignment,
-    reportId: string,
-    targetUserId: string,
-    reason: string,
-    clipCount: number,
-  ): Promise<void> {
-    const notificationChannelId = assignment.report_notification_channel_discord_id;
-    if (!notificationChannelId || !interaction.guild) return;
-
-    const rawRoles = assignment.report_mention_role_discord_ids ?? [];
-    const roleIds = rawRoles.filter((roleId) => /^\d{16,25}$/.test(roleId));
-    const mentionLine = roleIds.map((roleId) => `<@&${roleId}>`).join(' ');
-    const voiceChannelMention = `<#${assignment.channel_discord_id}>`;
-    const targetMention = `<@${targetUserId}>`;
-    const reporterMention = `<@${interaction.user.id}>`;
-    const clippedReason = reason.length > 700 ? `${reason.slice(0, 697)}...` : reason;
-    const content = [
-      mentionLine,
-      '**Nouveau signalement vocal**',
-      `Salon vocal : ${voiceChannelMention}`,
-      `Signalé : ${targetMention}`,
-      `Auteur : ${reporterMention}`,
-      `Extraits audio : ${clipCount}`,
-      `Référence : \`${reportId}\``,
-      `Motif : ${clippedReason}`,
-    ].filter(Boolean).join('\n');
-
-    const channel = await interaction.guild.channels.fetch(notificationChannelId).catch(() => null);
-    if (!channel?.isTextBased() || !('send' in channel)) return;
-
-    await channel.send({
-      content,
-      allowedMentions: { roles: roleIds, users: [targetUserId, interaction.user.id] },
-    }).catch((error: unknown) => {
-      console.error(JSON.stringify({ level: 'error', event: 'report_notification_failed', message: error instanceof Error ? error.message : 'unknown', report_id: reportId }));
+    await this.notifier.notify({
+      assignment,
+      reportId: report.id,
+      targetUserId,
+      reporterUserId: interaction.user.id,
+      reason,
+      clipCount,
+      source: 'manual',
     });
   }
 }
