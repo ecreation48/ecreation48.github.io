@@ -87,6 +87,15 @@ ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_MAX_TRANSCRIPT
 ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_GLOBAL_TRANSCRIPTION_LIMIT 1
 ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_COOLDOWN_SECONDS 300
 
+APP_URL="$(env_value /etc/voice-guardian/web.env APP_URL)"
+if [[ -n "$APP_URL" ]]; then
+  if grep -q '^APP_URL=' /etc/voice-guardian/worker.env; then
+    sed -i "s#^APP_URL=.*#APP_URL=${APP_URL}#g" /etc/voice-guardian/worker.env
+  else
+    echo "APP_URL=${APP_URL}" >> /etc/voice-guardian/worker.env
+  fi
+fi
+
 ensure_whisper_installation
 
 sudo -u "$APP_USER" composer install --working-dir=apps/web --no-dev --prefer-dist --no-interaction --optimize-autoloader
