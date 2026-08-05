@@ -538,6 +538,7 @@ export class VoiceAssignmentManager {
     if (!sessionId) return;
 
     const members = this.humanMembers(channel);
+    this.audioRecorder.updateUsers(guildId, members.map((member) => member.discord_user_id));
     await this.api.voiceSessionHeartbeat(sessionId, { member_count: members.length, status: 'active', members });
   }
 
