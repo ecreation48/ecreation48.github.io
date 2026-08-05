@@ -37,6 +37,25 @@ export class VoiceAssignmentManager {
     this.lockOwner = `bot:${botId}`;
   }
 
+  async activeMonitoringTargets(): Promise<Array<ChannelAssignment & { user_ids: string[] }>> {
+    const targets: Array<ChannelAssignment & { user_ids: string[] }> = [];
+
+    for (const [guildId, channelId] of this.activeChannels) {
+      const assignment = this.assignments.get(channelId);
+      if (!assignment) continue;
+
+      const channel = await this.currentChannel(guildId);
+      if (!channel || channel.id !== channelId || !this.hasEnoughHumanMembers(channel)) continue;
+
+      targets.push({
+        ...assignment,
+        user_ids: this.humanMembers(channel).map((member) => member.discord_user_id),
+      });
+    }
+
+    return targets;
+  }
+
   setAssignments(assignments: ChannelAssignment[]): void {
     this.assignments = new Map(assignments.map((assignment) => [assignment.channel_discord_id, assignment]));
     this.logInfo('voice_assignments_refreshed', {

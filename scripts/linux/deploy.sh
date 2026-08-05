@@ -34,6 +34,10 @@ ensure_env_value /etc/voice-guardian/worker.env DISCORD_CHANNEL_SYNC_INTERVAL_MS
 ensure_env_value /etc/voice-guardian/worker.env VOICE_MIN_HUMAN_MEMBERS 2
 ensure_env_value /etc/voice-guardian/worker.env VOICE_INSUFFICIENT_MEMBERS_GRACE_MS 2000
 ensure_env_value /etc/voice-guardian/worker.env VOICE_CHANNEL_LOCK_TTL_MS 45000
+ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_DETECTION true
+ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_INTERVAL_MS 30000
+ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_MAX_TRANSCRIPTIONS_PER_CYCLE 2
+ensure_env_value /etc/voice-guardian/worker.env AUTO_BLOCKED_WORD_COOLDOWN_SECONDS 300
 
 sudo -u "$APP_USER" composer install --working-dir=apps/web --no-dev --prefer-dist --no-interaction --optimize-autoloader
 sudo -u "$APP_USER" npm ci

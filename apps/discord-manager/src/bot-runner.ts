@@ -1,6 +1,7 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import type { Redis } from 'ioredis';
 import { AudioBufferRecorder } from './audio-buffer-recorder.js';
+import { AutomaticBlockedWordRunner } from './automatic-blocked-word-runner.js';
 import type { ApiClient, BotSummary } from './api-client.js';
 import { CommandHandler } from './command-handler.js';
 import { DiscordChannelSyncRunner } from './discord-channel-sync-runner.js';
@@ -19,6 +20,7 @@ export class BotRunner {
   private moderationRunner: ModerationActionRunner | null = null;
   private broadcastRunner: VoiceBroadcastRunner | null = null;
   private transcriptionRunner: TranscriptionJobRunner | null = null;
+  private automaticBlockedWordRunner: AutomaticBlockedWordRunner | null = null;
   private channelSyncRunner: DiscordChannelSyncRunner | null = null;
   private lastRestartRequestedAt: string | null;
   private readonly audioRecorder: AudioBufferRecorder;
@@ -52,6 +54,7 @@ export class BotRunner {
       this.moderationRunner = new ModerationActionRunner(this.client, this.api, this.bot.id);
       this.broadcastRunner = new VoiceBroadcastRunner(this.api, this.bot.id);
       this.transcriptionRunner = new TranscriptionJobRunner(this.api);
+      this.automaticBlockedWordRunner = new AutomaticBlockedWordRunner(this.api, this.lock.redis, this.audioRecorder);
       this.channelSyncRunner = new DiscordChannelSyncRunner(this.client, this.api, this.bot.id);
 
       this.client.once(Events.ClientReady, () => void this.onReady().catch((error) => this.logError('ready_failed', error)));
@@ -89,6 +92,7 @@ export class BotRunner {
     await this.refreshAssignments();
     void this.commandHandler?.registerSafely();
     await this.voiceManager?.reconcile();
+    await this.automaticBlockedWordRunner?.runDue(await this.voiceManager?.activeMonitoringTargets() ?? []);
     await this.moderationRunner?.runPending();
     await this.broadcastRunner?.runPending();
     await this.transcriptionRunner?.runPending();
@@ -110,6 +114,7 @@ export class BotRunner {
     await this.channelSyncRunner?.runDue();
     await this.refreshAssignments();
     await this.voiceManager?.reconcile();
+    await this.automaticBlockedWordRunner?.runDue(await this.voiceManager?.activeMonitoringTargets() ?? []);
     await this.moderationRunner?.runPending();
     await this.broadcastRunner?.runPending();
     await this.transcriptionRunner?.runPending();

@@ -6,12 +6,14 @@ export interface VoiceSessionMemberPayload {discord_user_id:string;display_name?
 export interface VoiceSessionPayload {discord_bot_id:string;discord_guild_id:string;discord_channel_id:string;member_count:number;members?:VoiceSessionMemberPayload[]}
 export interface VoiceEventPayload {guild_discord_id:string;channel_discord_id?:string;discord_user_id?:string;type:'voice_join'|'voice_leave'|'voice_move'|'voice_mute'|'voice_unmute'|'voice_deafen'|'voice_undeafen'|'screen_share_start'|'screen_share_stop'|'bot_join'|'bot_leave';payload?:Record<string,unknown>;occurred_at?:string}
 export interface VoiceReportPayload {guild_discord_id:string;channel_discord_id:string;reported_user_discord_id:string;reporter_user_discord_id:string;reason:string;comment?:string}
+export interface AutomaticVoiceReportPayload extends VoiceReportPayload {source:'blocked_word';detection_confidence?:number|null;detection_metadata?:Record<string,unknown>}
 export interface AudioClipPayload {voice_report_id:string;guild_discord_id:string;channel_discord_id:string;reported_user_discord_id:string;storage_path:string;mime_type:string;size_bytes:number;duration_seconds:number;captured_from:string;captured_until:string}
 export interface TranscriptSegmentPayload {start_seconds:number;end_seconds:number;text:string;confidence?:number|null}
 export interface TranscriptPayload {voice_report_id:string;voice_audio_clip_id?:string|null;reported_user_discord_id?:string|null;status:'pending'|'processing'|'completed'|'failed'|'skipped';text?:string|null;language?:string|null;confidence?:number|null;engine?:string|null;duration_ms?:number|null;error_message?:string|null;segments?:TranscriptSegmentPayload[]}
 export interface TranscriptJob {id:string;voice_report_id:string;voice_audio_clip_id:string;reported_user_discord_id:string;storage_path:string}
 export interface ModerationActionJob {id:string;guild_discord_id:string;target_user_discord_id:string;type:'warn'|'disconnect'|'timeout'|'move'|'mute'|'kick'|'ban'|'note'|'dismiss'|'delete_audio';duration_seconds:number|null;reason:string|null}
 export interface VoiceBroadcastJob {id:string;guild_discord_id:string;channel_discord_id:string;type:'file';storage_path:string|null;mime_type:string|null;title:string|null}
+export interface ForbiddenWord {id:string;word:string;normalized_word:string;severity:string}
 interface ApiEnvelope<T>{data:T}
 
 export class ApiClient {
@@ -39,10 +41,11 @@ export class ApiClient {
   voiceSessionHeartbeat(id:string,payload:{member_count:number;status?:'active'|'empty'|'error';members?:VoiceSessionMemberPayload[]}):Promise<{accepted:boolean}>{return this.request(`/voice-sessions/${id}/heartbeat`,{method:'POST',body:JSON.stringify(payload)});}
   endVoiceSession(id:string):Promise<{accepted:boolean}>{return this.request(`/voice-sessions/${id}`,{method:'DELETE'});}
   createVoiceEvent(payload:VoiceEventPayload):Promise<{id:string}>{return this.request('/events',{method:'POST',body:JSON.stringify(payload)});}
-  createVoiceReport(payload:VoiceReportPayload):Promise<{id:string;status:string}>{return this.request('/reports',{method:'POST',body:JSON.stringify(payload)});}
+  createVoiceReport(payload:VoiceReportPayload|AutomaticVoiceReportPayload):Promise<{id:string;status:string}>{return this.request('/reports',{method:'POST',body:JSON.stringify(payload)});}
   createAudioClip(payload:AudioClipPayload):Promise<{id:string}>{return this.request('/audio-clips',{method:'POST',body:JSON.stringify(payload)});}
   transcripts(limit=5):Promise<TranscriptJob[]>{return this.request(`/transcripts?limit=${limit}`);}
   createTranscript(payload:TranscriptPayload):Promise<{id:string;status:string}>{return this.request('/transcripts',{method:'POST',body:JSON.stringify(payload)});}
+  forbiddenWords():Promise<ForbiddenWord[]>{return this.request('/forbidden-words');}
   moderationActions(botId:string):Promise<ModerationActionJob[]>{return this.request(`/moderation-actions?bot_id=${encodeURIComponent(botId)}`);}
   updateModerationAction(id:string,payload:{result:'success'|'failed'|'recorded';error_message?:string}):Promise<{accepted:boolean}>{return this.request(`/moderation-actions/${id}`,{method:'POST',body:JSON.stringify(payload)});}
   voiceBroadcasts(botId:string):Promise<VoiceBroadcastJob[]>{return this.request(`/voice-broadcasts?bot_id=${encodeURIComponent(botId)}`);}

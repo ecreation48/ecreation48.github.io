@@ -1,5 +1,6 @@
 <?php
 use App\Http\Controllers\Api\V1\BotController;
+use App\Http\Controllers\Api\V1\ForbiddenWordController;
 use App\Http\Controllers\Api\V1\ModerationActionController;
 use App\Http\Controllers\Api\V1\VoiceEventController;
 use App\Http\Controllers\Api\V1\VoiceAudioClipController;
@@ -22,6 +23,7 @@ Route::prefix('v1/internal')->middleware(['service','throttle:120,1'])->group(fu
     Route::post('/audio-clips', [VoiceAudioClipController::class, 'store']);
     Route::get('/transcripts', [VoiceTranscriptController::class, 'index']);
     Route::post('/transcripts', [VoiceTranscriptController::class, 'store']);
+    Route::get('/forbidden-words', [ForbiddenWordController::class, 'index']);
     Route::get('/voice-broadcasts', [VoiceBroadcastController::class, 'index']);
     Route::post('/voice-broadcasts/{voiceBroadcast}', [VoiceBroadcastController::class, 'update']);
     Route::get('/moderation-actions', [ModerationActionController::class, 'index']);
