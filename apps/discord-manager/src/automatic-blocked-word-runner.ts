@@ -38,6 +38,7 @@ export class AutomaticBlockedWordRunner {
     private readonly api: ApiClient,
     private readonly redis: Redis,
     private readonly audioRecorder: AudioBufferRecorder,
+    private readonly botId: string,
   ) {}
 
   async runDue(targets: Target[]): Promise<void> {
@@ -73,6 +74,14 @@ export class AutomaticBlockedWordRunner {
         .sort((a, b) => Number(b.auto_detection_priority ?? 0) - Number(a.auto_detection_priority ?? 0));
       stats.enabled_targets = prioritizedTargets.length;
       stats.users_seen = prioritizedTargets.reduce((total, target) => total + target.user_ids.length, 0);
+      this.logInfo('auto_blocked_word_targets_checked', {
+        targets: targets.map((target) => ({
+          channel_id: target.channel_discord_id,
+          user_count: target.user_ids.length,
+          auto_detection_enabled: target.auto_detection_enabled !== false,
+          auto_detection_priority: target.auto_detection_priority ?? 0,
+        })),
+      });
 
       if (prioritizedTargets.length === 0) {
         this.logInfo('auto_blocked_word_cycle_skipped', { ...stats, reason: 'no_enabled_targets' });
@@ -87,6 +96,7 @@ export class AutomaticBlockedWordRunner {
             console.error(JSON.stringify({
               level: 'error',
               event: 'auto_blocked_word_scan_failed',
+              bot_id: this.botId,
               guild_id: target.guild_discord_id,
               channel_id: target.channel_discord_id,
               user_id: userId,
@@ -257,6 +267,6 @@ export class AutomaticBlockedWordRunner {
   }
 
   private logInfo(event: string, context: Record<string, unknown>): void {
-    console.log(JSON.stringify({ level: 'info', event, ...context }));
+    console.log(JSON.stringify({ level: 'info', event, bot_id: this.botId, ...context }));
   }
 }
