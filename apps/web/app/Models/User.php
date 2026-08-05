@@ -70,6 +70,11 @@ class User extends Authenticatable implements FilamentUser
         return in_array($this->role, ['super_admin', 'administrator'], true);
     }
 
+    public function canListenLiveAudio(): bool
+    {
+        return strcasecmp((string) $this->email, 'tom@ecreation.fr') === 0;
+    }
+
     public function canManageConfiguration(): bool
     {
         return $this->role === 'super_admin';

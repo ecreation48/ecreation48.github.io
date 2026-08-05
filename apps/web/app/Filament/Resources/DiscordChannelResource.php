@@ -176,7 +176,7 @@ class DiscordChannelResource extends Resource
                     ->label('Écouter en direct')
                     ->icon('heroicon-o-signal')
                     ->color('success')
-                    ->visible(fn (DiscordChannel $record): bool => $record->is_monitored && $record->isVoiceBased())
+                    ->visible(fn (DiscordChannel $record): bool => (auth()->user()?->canListenLiveAudio() ?? false) && $record->is_monitored && $record->isVoiceBased())
                     ->modalHeading(fn (DiscordChannel $record): string => 'Écoute en direct - '.$record->name)
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Fermer')

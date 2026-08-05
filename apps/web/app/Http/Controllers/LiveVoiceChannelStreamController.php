@@ -10,6 +10,7 @@ class LiveVoiceChannelStreamController
 {
     public function __invoke(DiscordChannel $discordChannel): StreamedResponse|Response
     {
+        abort_unless(auth()->user()?->canListenLiveAudio() ?? false, 403);
         abort_unless($discordChannel->isVoiceBased(), 404);
 
         @set_time_limit(0);
