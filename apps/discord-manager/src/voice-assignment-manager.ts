@@ -239,14 +239,18 @@ export class VoiceAssignmentManager {
       return;
     }
 
-    if (!await this.acquireChannelLock(guild.id, channel.id)) {
+    const lockOwner = await this.channelLockOwner(guild.id, channel.id);
+    if (lockOwner !== null && lockOwner !== this.lockOwner) {
       this.logInfo('voice_channel_lock_busy', {
         guild_id: guild.id,
         channel_id: channel.id,
         channel_name: channel.name,
+        lock_owner: lockOwner,
       });
       return;
     }
+
+    if (!await this.acquireChannelLock(guild.id, channel.id)) return;
 
     const joinAttempt = this.nextJoinAttempt(guild.id);
 
@@ -306,6 +310,11 @@ export class VoiceAssignmentManager {
       discord_channel_id: assignment.channel_id,
       member_count: members.length,
       members,
+    }).catch(async (error) => {
+      this.logError('voice_session_create_failed', error);
+      nextConnection.destroy();
+      await this.releaseChannelLock(guild.id, channel.id);
+      throw error;
     });
 
     this.sessions.set(guild.id, session.id);
@@ -529,7 +538,7 @@ export class VoiceAssignmentManager {
   }
 
   private logError(event: string, error: unknown): void {
-    console.error(JSON.stringify({ level: 'error', event, message: error instanceof Error ? error.message : 'unknown' }));
+    console.error(JSON.stringify({ level: 'error', event, bot_id: this.botId, message: error instanceof Error ? error.message : 'unknown' }));
   }
 
   private async firstActiveAssignment(assignments: ChannelAssignment[]): Promise<ChannelAssignment | null> {
@@ -553,7 +562,21 @@ export class VoiceAssignmentManager {
         human_member_count: members.length,
       });
 
-      if (members.length >= MIN_HUMAN_MEMBERS && await this.isChannelAvailable(assignment.guild_discord_id, assignment.channel_discord_id)) return assignment;
+      if (members.length < MIN_HUMAN_MEMBERS) continue;
+
+      const lockOwner = await this.channelLockOwner(assignment.guild_discord_id, assignment.channel_discord_id);
+      if (lockOwner !== null && lockOwner !== this.lockOwner) {
+        this.logInfo('voice_assignment_locked', {
+          guild_id: assignment.guild_discord_id,
+          channel_id: assignment.channel_discord_id,
+          channel_name: channel.name,
+          human_member_count: members.length,
+          lock_owner: lockOwner,
+        });
+        continue;
+      }
+
+      return assignment;
     }
 
     return null;
@@ -725,12 +748,11 @@ export class VoiceAssignmentManager {
       .catch(() => undefined);
   }
 
-  private async isChannelAvailable(guildId: string, channelId: string): Promise<boolean> {
-    const owner = await this.redis.get(this.channelLockKey(guildId, channelId)).catch(() => null);
-    return owner === null || owner === this.lockOwner;
+  private async channelLockOwner(guildId: string, channelId: string): Promise<string | null> {
+    return this.redis.get(this.channelLockKey(guildId, channelId)).catch(() => null);
   }
 
   private logInfo(event: string, context: Record<string, unknown> = {}): void {
-    console.log(JSON.stringify({ level: 'info', event, ...context }));
+    console.log(JSON.stringify({ level: 'info', event, bot_id: this.botId, ...context }));
   }
 }
