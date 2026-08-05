@@ -13,6 +13,14 @@ interface Match {
   segment?: TranscriptSegmentPayload;
 }
 
+interface ScanResult {
+  snapshot: boolean;
+  transcribed: boolean;
+  matched: boolean;
+  reported: boolean;
+  skipped_reason?: string;
+}
+
 const ENABLED = process.env.AUTO_BLOCKED_WORD_DETECTION !== 'false';
 const INTERVAL_MS = Number(process.env.AUTO_BLOCKED_WORD_INTERVAL_MS ?? 30_000);
 const MAX_TRANSCRIPTIONS_PER_CYCLE = Number(process.env.AUTO_BLOCKED_WORD_MAX_TRANSCRIPTIONS_PER_CYCLE ?? 2);
@@ -36,22 +44,46 @@ export class AutomaticBlockedWordRunner {
     if (!ENABLED || this.running || Date.now() - this.lastRunAt < INTERVAL_MS) return;
 
     this.running = true;
+    const startedAt = Date.now();
+    const stats = {
+      targets: targets.length,
+      enabled_targets: 0,
+      users_seen: 0,
+      processed: 0,
+      snapshots: 0,
+      transcribed: 0,
+      matched: 0,
+      reported: 0,
+      skipped: 0,
+      forbidden_words: 0,
+    };
 
     try {
       await this.refreshForbiddenWords();
-      if (this.forbiddenWords.length === 0) return;
+      stats.forbidden_words = this.forbiddenWords.length;
+      if (this.forbiddenWords.length === 0) {
+        this.logInfo('auto_blocked_word_cycle_skipped', { ...stats, reason: 'no_forbidden_words' });
+        return;
+      }
 
       let processed = 0;
 
       const prioritizedTargets = targets
         .filter((target) => target.auto_detection_enabled !== false)
         .sort((a, b) => Number(b.auto_detection_priority ?? 0) - Number(a.auto_detection_priority ?? 0));
+      stats.enabled_targets = prioritizedTargets.length;
+      stats.users_seen = prioritizedTargets.reduce((total, target) => total + target.user_ids.length, 0);
+
+      if (prioritizedTargets.length === 0) {
+        this.logInfo('auto_blocked_word_cycle_skipped', { ...stats, reason: 'no_enabled_targets' });
+        return;
+      }
 
       for (const target of prioritizedTargets) {
         for (const userId of target.user_ids) {
           if (processed >= MAX_TRANSCRIPTIONS_PER_CYCLE) return;
 
-          await this.scanUser(target, userId).catch((error) => {
+          const result = await this.scanUser(target, userId).catch((error): ScanResult => {
             console.error(JSON.stringify({
               level: 'error',
               event: 'auto_blocked_word_scan_failed',
@@ -60,28 +92,55 @@ export class AutomaticBlockedWordRunner {
               user_id: userId,
               message: error instanceof Error ? error.message : 'unknown',
             }));
+
+            return { snapshot: false, transcribed: false, matched: false, reported: false, skipped_reason: 'error' };
           });
 
+          stats.processed++;
+          if (result.snapshot) stats.snapshots++;
+          if (result.transcribed) stats.transcribed++;
+          if (result.matched) stats.matched++;
+          if (result.reported) stats.reported++;
+          if (result.skipped_reason) stats.skipped++;
           processed++;
         }
       }
     } finally {
+      this.logInfo('auto_blocked_word_cycle_completed', {
+        ...stats,
+        duration_ms: Date.now() - startedAt,
+        max_transcriptions_per_cycle: MAX_TRANSCRIPTIONS_PER_CYCLE,
+      });
       this.lastRunAt = Date.now();
       this.running = false;
     }
   }
 
-  private async scanUser(target: Target, userId: string): Promise<void> {
+  private async scanUser(target: Target, userId: string): Promise<ScanResult> {
     const reportKey = `${target.channel_id}-${userId}-${Date.now()}`;
     const snapshot = await this.audioRecorder.snapshot(target.guild_discord_id, userId, `auto-${reportKey}`);
-    if (!snapshot || snapshot.durationSeconds < 2) return;
+    if (!snapshot) return { snapshot: false, transcribed: false, matched: false, reported: false, skipped_reason: 'snapshot_unavailable' };
+    if (snapshot.durationSeconds < 2) return { snapshot: true, transcribed: false, matched: false, reported: false, skipped_reason: 'snapshot_too_short' };
 
     const transcript = await this.transcriber.transcribe(`auto-${reportKey}`, `auto-${reportKey}`, userId, snapshot.path);
-    if (transcript.status !== 'completed' || !transcript.text) return;
+    if (transcript.status !== 'completed') {
+      this.logInfo('auto_blocked_word_transcription_not_completed', {
+        guild_id: target.guild_discord_id,
+        channel_id: target.channel_discord_id,
+        user_id: userId,
+        status: transcript.status,
+        engine: transcript.engine ?? null,
+        error_message: transcript.error_message ?? null,
+      });
+
+      return { snapshot: true, transcribed: false, matched: false, reported: false, skipped_reason: `transcription_${transcript.status}` };
+    }
+
+    if (!transcript.text) return { snapshot: true, transcribed: true, matched: false, reported: false, skipped_reason: 'empty_transcript' };
 
     const match = this.firstMatch(transcript);
-    if (!match) return;
-    if (!await this.claimCooldown(target, userId, match.word.normalized_word)) return;
+    if (!match) return { snapshot: true, transcribed: true, matched: false, reported: false, skipped_reason: 'no_match' };
+    if (!await this.claimCooldown(target, userId, match.word.normalized_word)) return { snapshot: true, transcribed: true, matched: true, reported: false, skipped_reason: 'cooldown' };
 
     const confidence = match.confidence ?? transcript.confidence ?? 0.6;
     const report = await this.api.createVoiceReport({
@@ -138,6 +197,8 @@ export class AutomaticBlockedWordRunner {
       word: match.word.word,
       confidence,
     }));
+
+    return { snapshot: true, transcribed: true, matched: true, reported: true };
   }
 
   private firstMatch(transcript: TranscriptPayload): Match | null {
@@ -193,5 +254,9 @@ export class AutomaticBlockedWordRunner {
 
   private escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private logInfo(event: string, context: Record<string, unknown>): void {
+    console.log(JSON.stringify({ level: 'info', event, ...context }));
   }
 }
