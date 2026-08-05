@@ -152,7 +152,7 @@ Installation CPU :
 sudo bash /opt/voice-guardian/scripts/linux/install-whisper.sh
 ```
 
-Le modèle par défaut est `small`. Pour un modèle plus rapide :
+Le modèle par défaut est `tiny`, recommandé pour la détection live rapide. Pour un modèle un peu plus précis :
 
 ```bash
 sudo MODEL=base bash /opt/voice-guardian/scripts/linux/install-whisper.sh
@@ -173,7 +173,7 @@ TRANSCRIPTION_PROVIDER=command
 TRANSCRIPTION_ENGINE=whisper.cpp
 TRANSCRIPTION_LANGUAGE=fr
 WHISPER_CPP_BINARY=/opt/whisper.cpp/build/bin/whisper-cli
-WHISPER_CPP_MODEL=/opt/whisper.cpp/models/ggml-small.bin
+WHISPER_CPP_MODEL=/opt/whisper.cpp/models/ggml-tiny.bin
 WHISPER_CPP_USE_GPU=false
 TRANSCRIPTION_COMMAND='node /opt/voice-guardian/scripts/transcribe-whisper-json.mjs {file}'
 ```
@@ -250,7 +250,7 @@ Test Whisper :
 ```bash
 sudo -u voiceguardian \
   WHISPER_CPP_BINARY=/opt/whisper.cpp/build/bin/whisper-cli \
-  WHISPER_CPP_MODEL=/opt/whisper.cpp/models/ggml-small.bin \
+  WHISPER_CPP_MODEL=/opt/whisper.cpp/models/ggml-tiny.bin \
   WHISPER_CPP_USE_GPU=false \
   TRANSCRIPTION_LANGUAGE=fr \
   node /opt/voice-guardian/scripts/transcribe-whisper-json.mjs /chemin/vers/audio.mp3

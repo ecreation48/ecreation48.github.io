@@ -2,7 +2,7 @@
 set -euo pipefail
 
 WHISPER_DIR="${WHISPER_DIR:-/opt/whisper.cpp}"
-MODEL="${MODEL:-small}"
+MODEL="${MODEL:-tiny}"
 USE_CUDA="${USE_CUDA:-false}"
 
 if [[ "$EUID" -ne 0 ]]; then
