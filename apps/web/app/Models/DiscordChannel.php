@@ -78,13 +78,6 @@ class DiscordChannel extends Model
             if ($channel->is_monitored && ! $channel->isVoiceBased()) {
                 throw ValidationException::withMessages(['is_monitored' => 'Seuls les salons vocaux peuvent être surveillés.']);
             }
-
-            if ($channel->is_monitored && blank($channel->discord_bot_id) && filled($channel->discord_guild_id)) {
-                $guildBotId = DiscordGuild::query()->whereKey($channel->discord_guild_id)->value('discord_bot_id');
-                if (filled($guildBotId)) {
-                    $channel->discord_bot_id = $guildBotId;
-                }
-            }
         });
     }
 

@@ -95,6 +95,11 @@ class DiscordBotResource extends Resource
                     ->description(fn (DiscordBot $record): ?string => self::currentVoiceChannelsActivity($record))
                     ->placeholder('Aucun salon')
                     ->wrap(),
+                Tables\Columns\TextColumn::make('auto_detection_channels')
+                    ->label('Détection live')
+                    ->state(fn (DiscordBot $record): string => self::autoDetectionChannels($record))
+                    ->placeholder('Aucun scan')
+                    ->wrap(),
                 Tables\Columns\TextColumn::make('workerInstance.name')
                     ->label('Worker')
                     ->placeholder('Aucun worker')
@@ -456,6 +461,27 @@ class DiscordBotResource extends Resource
             ->first();
 
         return $lastActivity ? 'Activité '.$lastActivity->diffForHumans() : null;
+    }
+
+    private static function autoDetectionChannels(DiscordBot $bot): string
+    {
+        $sessions = $bot->activeVoiceSessions
+            ->filter(fn ($session): bool => (bool) ($session->channel?->moderation_config['auto_detection_enabled'] ?? true));
+
+        if ($sessions->isEmpty()) {
+            return 'Aucun scan';
+        }
+
+        return $sessions
+            ->sortByDesc(fn ($session): int => (int) ($session->channel?->moderation_config['auto_detection_priority'] ?? 0))
+            ->map(function ($session): string {
+                $guild = $session->guild?->name ?? 'Serveur inconnu';
+                $channel = $session->channel?->name ?? 'Salon inconnu';
+                $priority = (int) ($session->channel?->moderation_config['auto_detection_priority'] ?? 0);
+
+                return "{$guild} - {$channel} (priorité {$priority})";
+            })
+            ->join("\n");
     }
 
     private static function isStaleConnecting(DiscordBot $bot): bool

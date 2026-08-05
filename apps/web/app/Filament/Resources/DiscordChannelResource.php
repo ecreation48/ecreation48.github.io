@@ -94,7 +94,16 @@ class DiscordChannelResource extends Resource
                         ->default(fn (): bool => (bool) app(GlobalSettings::class)->get('defaults.volume_analysis_enabled', false)),
                     Forms\Components\Toggle::make('transcription_enabled')
                         ->default(fn (): bool => (bool) app(GlobalSettings::class)->get('defaults.transcription_enabled', false)),
-                    Forms\Components\KeyValue::make('moderation_config')->columnSpanFull(),
+                    Forms\Components\Toggle::make('moderation_config.auto_detection_enabled')
+                        ->label('Détection live des mots bloqués')
+                        ->default(true),
+                    Forms\Components\TextInput::make('moderation_config.auto_detection_priority')
+                        ->label('Priorité détection live')
+                        ->numeric()
+                        ->minValue(0)
+                        ->maxValue(100)
+                        ->default(0)
+                        ->helperText('Plus la valeur est haute, plus ce salon est transcrit en priorité.'),
                 ]),
         ]);
     }
@@ -112,6 +121,14 @@ class DiscordChannelResource extends Resource
                 Tables\Columns\IconColumn::make('transcription_enabled')
                     ->label('Transcription')
                     ->boolean(),
+                Tables\Columns\IconColumn::make('auto_detection_enabled')
+                    ->label('Détection live')
+                    ->state(fn (DiscordChannel $record): bool => (bool) ($record->moderation_config['auto_detection_enabled'] ?? true))
+                    ->boolean(),
+                Tables\Columns\TextColumn::make('auto_detection_priority')
+                    ->label('Priorité')
+                    ->state(fn (DiscordChannel $record): int => (int) ($record->moderation_config['auto_detection_priority'] ?? 0))
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw("COALESCE(NULLIF(moderation_config->>'auto_detection_priority', '')::int, 0) {$direction}")),
                 Tables\Columns\TextColumn::make('buffer_seconds')->suffix(' s'),
             ])
             ->filters([
@@ -239,6 +256,34 @@ class DiscordChannelResource extends Resource
 
                         Notification::make()
                             ->title('Transcription désactivée')
+                            ->success()
+                            ->send();
+                    }),
+                Tables\Actions\Action::make('setDetectionPriority')
+                    ->label('Priorité détection')
+                    ->icon('heroicon-o-adjustments-horizontal')
+                    ->color('info')
+                    ->visible(fn (DiscordChannel $record): bool => $record->is_monitored && $record->isVoiceBased())
+                    ->form([
+                        Forms\Components\Toggle::make('auto_detection_enabled')
+                            ->label('Détection live active')
+                            ->default(fn (DiscordChannel $record): bool => (bool) ($record->moderation_config['auto_detection_enabled'] ?? true)),
+                        Forms\Components\TextInput::make('auto_detection_priority')
+                            ->label('Priorité')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->default(fn (DiscordChannel $record): int => (int) ($record->moderation_config['auto_detection_priority'] ?? 0)),
+                    ])
+                    ->action(function (DiscordChannel $record, array $data): void {
+                        $config = $record->moderation_config ?? [];
+                        $config['auto_detection_enabled'] = (bool) ($data['auto_detection_enabled'] ?? true);
+                        $config['auto_detection_priority'] = (int) ($data['auto_detection_priority'] ?? 0);
+                        $record->update(['moderation_config' => $config]);
+
+                        Notification::make()
+                            ->title('Priorité mise à jour')
+                            ->body('Le worker utilisera ce réglage au prochain cycle.')
                             ->success()
                             ->send();
                     }),

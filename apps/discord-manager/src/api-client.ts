@@ -1,5 +1,5 @@
 export interface BotSummary {id:string;name:string;client_id:string;connection_status:string;restart_requested_at?:string|null}
-export interface ChannelAssignment {channel_id:string;channel_discord_id:string;guild_id:string;guild_discord_id:string;buffer_seconds:number;volume_analysis_enabled:boolean;transcription_enabled:boolean;retention_days:number;report_notification_channel_discord_id?:string|null;report_mention_role_discord_ids?:string[]}
+export interface ChannelAssignment {channel_id:string;channel_discord_id:string;guild_id:string;guild_discord_id:string;buffer_seconds:number;volume_analysis_enabled:boolean;transcription_enabled:boolean;retention_days:number;report_notification_channel_discord_id?:string|null;report_mention_role_discord_ids?:string[];auto_detection_enabled?:boolean;auto_detection_priority?:number}
 export interface BotAssignments {bot_id:string;channels:ChannelAssignment[]}
 export interface DiscordChannelSyncPayload {guild?:{name?:string;owner_id?:string};channels:{id:string;name:string;type:number;parent_id?:string|null;user_limit?:number}[];roles?:{id:string;name:string;position?:number}[]}
 export interface VoiceSessionMemberPayload {discord_user_id:string;display_name?:string}

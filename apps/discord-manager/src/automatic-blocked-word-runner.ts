@@ -43,7 +43,11 @@ export class AutomaticBlockedWordRunner {
 
       let processed = 0;
 
-      for (const target of targets) {
+      const prioritizedTargets = targets
+        .filter((target) => target.auto_detection_enabled !== false)
+        .sort((a, b) => Number(b.auto_detection_priority ?? 0) - Number(a.auto_detection_priority ?? 0));
+
+      for (const target of prioritizedTargets) {
         for (const userId of target.user_ids) {
           if (processed >= MAX_TRANSCRIPTIONS_PER_CYCLE) return;
 
