@@ -43,7 +43,7 @@ class ListForbiddenWords extends ListRecords
                         ->label('Fichier CSV')
                         ->disk('local')
                         ->directory('imports/forbidden-words')
-                        ->acceptedFileTypes(['text/csv', 'text/plain', 'application/vnd.ms-excel'])
+                        ->acceptedFileTypes(['text/csv', 'text/plain', 'application/csv', 'application/vnd.ms-excel', 'application/octet-stream'])
                         ->required(),
                 ])
                 ->action(function (array $data): void {
