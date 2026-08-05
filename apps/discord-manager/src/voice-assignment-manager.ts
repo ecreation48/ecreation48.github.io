@@ -22,6 +22,7 @@ export class VoiceAssignmentManager {
   private sessions = new Map<string, string>();
   private activeChannels = new Map<string, string>();
   private guildQueues = new Map<string, Promise<void>>();
+  private channelLockRenewTimers = new Map<string, NodeJS.Timeout>();
   private watchedConnections = new WeakSet<VoiceConnection>();
   private recoveringGuilds = new Set<string>();
   private joinAttempts = new Map<string, number>();
@@ -240,6 +241,7 @@ export class VoiceAssignmentManager {
       } else {
         this.audioRecorder.detach(guild.id);
         if (connection.joinConfig.channelId) {
+          this.clearChannelLockRenewTimer(guild.id, connection.joinConfig.channelId);
           await this.releaseChannelLock(guild.id, connection.joinConfig.channelId);
         }
         connection.destroy();
@@ -340,6 +342,7 @@ export class VoiceAssignmentManager {
     this.activeChannels.set(guild.id, channel.id);
     this.clearLeaveTimer(channel.id);
     await this.renewChannelLock(guild.id, channel.id);
+    this.startChannelLockRenewal(guild.id, channel.id);
     this.audioRecorder.attach(nextConnection, channel.id, session.id, assignment.buffer_seconds, members.map((member) => member.discord_user_id));
   }
 
@@ -472,6 +475,7 @@ export class VoiceAssignmentManager {
     this.activeChannels.delete(guildId);
     this.leaveTimers.delete(channelId);
     this.recoveringGuilds.delete(guildId);
+    this.clearChannelLockRenewTimer(guildId, channelId);
     await this.releaseChannelLock(guildId, channelId);
 
     const sessionId = this.sessions.get(guildId);
@@ -505,6 +509,7 @@ export class VoiceAssignmentManager {
     this.audioRecorder.detach(guildId);
     this.activeChannels.delete(guildId);
     this.leaveTimers.delete(channelId);
+    this.clearChannelLockRenewTimer(guildId, channelId);
     await this.releaseChannelLock(guildId, channelId);
 
     const sessionId = this.sessions.get(guildId);
@@ -545,6 +550,8 @@ export class VoiceAssignmentManager {
   async stop(): Promise<void> {
     for (const timer of this.leaveTimers.values()) clearTimeout(timer);
     this.leaveTimers.clear();
+    for (const timer of this.channelLockRenewTimers.values()) clearInterval(timer);
+    this.channelLockRenewTimers.clear();
 
     for (const [guildId, channelId] of this.activeChannels) {
       getVoiceConnection(guildId, this.connectionGroup)?.destroy();
@@ -709,6 +716,38 @@ export class VoiceAssignmentManager {
 
     clearTimeout(timer);
     this.leaveTimers.delete(channelId);
+  }
+
+  private channelLockRenewTimerKey(guildId: string, channelId: string): string {
+    return `${guildId}:${channelId}`;
+  }
+
+  private startChannelLockRenewal(guildId: string, channelId: string): void {
+    const key = this.channelLockRenewTimerKey(guildId, channelId);
+    this.clearChannelLockRenewTimer(guildId, channelId);
+
+    const intervalMs = Math.max(5_000, Math.floor(CHANNEL_LOCK_TTL_MS / 3));
+    const timer = setInterval(() => {
+      void this.renewChannelLock(guildId, channelId)
+        .then((renewed) => {
+          if (renewed) return;
+
+          this.logInfo('voice_channel_lock_lost', { guild_id: guildId, channel_id: channelId });
+          return this.enqueueGuild(guildId, () => this.leave(guildId, channelId, true), 'voice_channel_lock_lost_leave_failed');
+        })
+        .catch((error) => this.logError('voice_channel_lock_renew_failed', error));
+    }, intervalMs);
+
+    this.channelLockRenewTimers.set(key, timer);
+  }
+
+  private clearChannelLockRenewTimer(guildId: string, channelId: string): void {
+    const key = this.channelLockRenewTimerKey(guildId, channelId);
+    const timer = this.channelLockRenewTimers.get(key);
+    if (!timer) return;
+
+    clearInterval(timer);
+    this.channelLockRenewTimers.delete(key);
   }
 
   private nextJoinAttempt(guildId: string): number {
